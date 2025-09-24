@@ -81,70 +81,70 @@ spec:
         runAsUser: 1000
         fsGroup: 1000
       containers:
-      - name: registry
-        image: registry:2.8.3
-        imagePullPolicy: IfNotPresent
-        ports:
-        - containerPort: 5000
-          name: registry
-          protocol: TCP
-        env:
-        - name: REGISTRY_CONFIG_PATH
-          value: /etc/docker/registry/config.yml
-        - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
-          value: /var/lib/registry
-        securityContext:
-          allowPrivilegeEscalation: false
+        - name: registry
+          image: registry:2.8.3
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5000
+              name: registry
+              protocol: TCP
+          env:
+            - name: REGISTRY_CONFIG_PATH
+              value: /etc/docker/registry/config.yml
+            - name: REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY
+              value: /var/lib/registry
+          securityContext:
+            allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           capabilities:
             drop:
-            - ALL
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
-        volumeMounts:
-        - name: registry-storage
-          mountPath: /var/lib/registry
-        - name: registry-config
-          mountPath: /etc/docker/registry/config.yml
-          subPath: config.yml
-          readOnly: true
-        - name: registry-auth
-          mountPath: /etc/docker/registry/htpasswd
-          subPath: htpasswd
-          readOnly: true
-        - name: tmp
-          mountPath: /tmp
-        livenessProbe:
-          httpGet:
-            path: /v2/
-            port: 5000
-            scheme: HTTP
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /v2/
-            port: 5000
-            scheme: HTTP
-          initialDelaySeconds: 5
-          periodSeconds: 5
+              - ALL
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+          volumeMounts:
+            - name: registry-storage
+              mountPath: /var/lib/registry
+            - name: registry-config
+              mountPath: /etc/docker/registry/config.yml
+              subPath: config.yml
+              readOnly: true
+            - name: registry-auth
+              mountPath: /etc/docker/registry/htpasswd
+              subPath: htpasswd
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /v2/
+              port: 5000
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: 5000
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
       volumes:
-      - name: registry-storage
-        persistentVolumeClaim:
-          claimName: registry-storage
-      - name: registry-config
-        configMap:
-          name: registry-config
-      - name: registry-auth
-        secret:
-          secretName: registry-auth
-      - name: tmp
-        emptyDir: {}
+        - name: registry-storage
+          persistentVolumeClaim:
+            claimName: registry-storage
+        - name: registry-config
+          configMap:
+            name: registry-config
+        - name: registry-auth
+          secret:
+            secretName: registry-auth
+        - name: tmp
+          emptyDir: {}
 ---
 # Registry Service
 apiVersion: v1
@@ -158,10 +158,10 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - port: 5000
-    targetPort: 5000
-    protocol: TCP
-    name: registry
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+      name: registry
   selector:
     app: docker-registry
 ---
@@ -184,10 +184,10 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: registry.dev.127.0.0.1.nip.io
-    http:
-      paths:
-      - path: /
+    - host: registry.dev.127.0.0.1.nip.io
+      http:
+        paths:
+          - path: /
         pathType: Prefix
         backend:
           service:
@@ -207,4 +207,5 @@ type: Opaque
 stringData:
   # Generate with: htpasswd -bBn admin <password>
   # Default: admin/admin123 (CHANGE IN PRODUCTION!)
-  htpasswd: "admin:$2y$10$7PfWQwmDRLV3qy6g5M.6dOgT.2I.XQx4J3.9Qh8GKy5X6Z3K2G8fK"
+  # NOTE: This hash is for development only - use sealed secrets for production
+  htpasswd: "admin:$2y$10$developmentHashOnlyNotForProduction"

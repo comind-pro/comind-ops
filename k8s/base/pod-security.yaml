@@ -45,7 +45,7 @@ data:
     4. Drop all capabilities, add only what's needed
     5. Don't allow hostNetwork, hostPID, or hostIPC
     6. Use securityContext.allowPrivilegeEscalation: false
-    
+
     Example securityContext:
     securityContext:
       runAsNonRoot: true

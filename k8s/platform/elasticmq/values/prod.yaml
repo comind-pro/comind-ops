@@ -1,104 +1,104 @@
 # ElasticMQ Helm Values for Production Environment
 
 global:
-  namespace: platform-prod
-  domain: "prod.127.0.0.1.nip.io"
+    namespace: platform-prod
+    domain: "prod.127.0.0.1.nip.io"
 
 image:
-  repository: softwaremill/elasticmq
-  tag: "1.5.7"
-  pullPolicy: IfNotPresent
+    repository: softwaremill/elasticmq
+    tag: "1.5.7"
+    pullPolicy: IfNotPresent
 
 replicaCount: 2  # High availability in production
 
 service:
-  type: ClusterIP
-  sqs:
-    port: 9324
-  web:
-    port: 9325
+    type: ClusterIP
+    sqs:
+      port: 9324
+    web:
+      port: 9325
 
 ingress:
-  enabled: true
-  className: nginx
-  host: elasticmq.prod.127.0.0.1.nip.io
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
-    nginx.ingress.kubernetes.io/auth-type: basic
-    nginx.ingress.kubernetes.io/auth-secret: elasticmq-auth
-    nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required - ElasticMQ Production'
+    enabled: true
+    className: nginx
+    host: elasticmq.prod.127.0.0.1.nip.io
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/auth-type: basic
+      nginx.ingress.kubernetes.io/auth-secret: elasticmq-auth
+      nginx.ingress.kubernetes.io/auth-realm: 'Authentication Required - ElasticMQ Production'
 
 resources:
-  requests:
-    memory: "512Mi"
-    cpu: "200m"
-  limits:
-    memory: "2Gi"
-    cpu: "1000m"
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
 
 securityContext:
-  runAsNonRoot: true
-  runAsUser: 1000
-  fsGroup: 1000
-  allowPrivilegeEscalation: false
-  readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
 
 # ElasticMQ Configuration for production (robust settings)
 config:
-  queues:
-    - name: default
-      defaultVisibilityTimeout: "60 seconds"
-      delay: "10 seconds"
-      receiveMessageWait: "0 seconds"
-      deadLettersQueue:
-        name: "default-dlq"
-        maxReceiveCount: 5
-    - name: high-priority
-      defaultVisibilityTimeout: "30 seconds"
-      delay: "0 seconds"
-      receiveMessageWait: "0 seconds"
-    - name: notifications
-      defaultVisibilityTimeout: "120 seconds"
-      delay: "0 seconds"
-      receiveMessageWait: "0 seconds"
-      deadLettersQueue:
-        name: "notifications-dlq"
-        maxReceiveCount: 10
-    - name: batch-processing
-      defaultVisibilityTimeout: "300 seconds"
-      delay: "0 seconds"
-      receiveMessageWait: "20 seconds"
-      deadLettersQueue:
-        name: "batch-processing-dlq"
-        maxReceiveCount: 3
-    - name: default-dlq
-      defaultVisibilityTimeout: "300 seconds"
-    - name: notifications-dlq
-      defaultVisibilityTimeout: "300 seconds"
-    - name: batch-processing-dlq
-      defaultVisibilityTimeout: "600 seconds"
+    queues:
+      - name: default
+        defaultVisibilityTimeout: "60 seconds"
+        delay: "10 seconds"
+        receiveMessageWait: "0 seconds"
+        deadLettersQueue:
+          name: "default-dlq"
+          maxReceiveCount: 5
+      - name: high-priority
+        defaultVisibilityTimeout: "30 seconds"
+        delay: "0 seconds"
+        receiveMessageWait: "0 seconds"
+      - name: notifications
+        defaultVisibilityTimeout: "120 seconds"
+        delay: "0 seconds"
+        receiveMessageWait: "0 seconds"
+        deadLettersQueue:
+          name: "notifications-dlq"
+          maxReceiveCount: 10
+      - name: batch-processing
+        defaultVisibilityTimeout: "300 seconds"
+        delay: "0 seconds"
+        receiveMessageWait: "20 seconds"
+        deadLettersQueue:
+          name: "batch-processing-dlq"
+          maxReceiveCount: 3
+      - name: default-dlq
+        defaultVisibilityTimeout: "300 seconds"
+      - name: notifications-dlq
+        defaultVisibilityTimeout: "300 seconds"
+      - name: batch-processing-dlq
+        defaultVisibilityTimeout: "600 seconds"
 
 # Production-grade scheduling
 nodeSelector:
-  node-type: "platform"
+    node-type: "platform"
 
 tolerations: []
 
 affinity:
-  podAntiAffinity:
-    preferredDuringSchedulingIgnoredDuringExecution:
-    - weight: 100
-      podAffinityTerm:
-        labelSelector:
-          matchExpressions:
-          - key: app
-            operator: In
-            values:
-            - elasticmq
-        topologyKey: kubernetes.io/hostname
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values:
+              - elasticmq
+          topologyKey: kubernetes.io/hostname
 
 monitoring:
-  enabled: true
-  serviceMonitor:
     enabled: true
+    serviceMonitor:
+      enabled: true

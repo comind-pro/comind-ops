@@ -2,195 +2,195 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: elasticmq
-  namespace: platform-dev
-  labels:
-    app: elasticmq
-    component: queue
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
+    name: elasticmq
+    namespace: platform-dev
+    labels:
       app: elasticmq
-  template:
-    metadata:
-      labels:
+      component: queue
+spec:
+    replicas: 1
+    selector:
+      matchLabels:
         app: elasticmq
-        component: queue
-    spec:
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        fsGroup: 1000
-      containers:
-      - name: elasticmq
-        image: softwaremill/elasticmq:latest
-        imagePullPolicy: Always
-        ports:
-        - containerPort: 9324
-          name: sqs-api
-          protocol: TCP
-        - containerPort: 9325
-          name: web-ui
-          protocol: TCP
-        env:
-        - name: ELASTICMQ_OPTS
-          value: "-Dconfig.file=/opt/elasticmq.conf"
+    template:
+      metadata:
+        labels:
+          app: elasticmq
+          component: queue
+      spec:
         securityContext:
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-            - ALL
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "100m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        volumeMounts:
+          runAsNonRoot: true
+          runAsUser: 1000
+          fsGroup: 1000
+        containers:
+        - name: elasticmq
+          image: softwaremill/elasticmq:latest
+          imagePullPolicy: Always
+          ports:
+          - containerPort: 9324
+            name: sqs-api
+            protocol: TCP
+          - containerPort: 9325
+            name: web-ui
+            protocol: TCP
+          env:
+          - name: ELASTICMQ_OPTS
+            value: "-Dconfig.file=/opt/elasticmq.conf"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+              - ALL
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          volumeMounts:
+          - name: config
+            mountPath: /opt/elasticmq.conf
+            subPath: elasticmq.conf
+            readOnly: true
+          - name: tmp
+            mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 9325
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 9325
+            initialDelaySeconds: 5
+            periodSeconds: 5
+        volumes:
         - name: config
-          mountPath: /opt/elasticmq.conf
-          subPath: elasticmq.conf
-          readOnly: true
+          configMap:
+            name: elasticmq-config
         - name: tmp
-          mountPath: /tmp
-        livenessProbe:
-          httpGet:
-            path: /
-            port: 9325
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /
-            port: 9325
-          initialDelaySeconds: 5
-          periodSeconds: 5
-      volumes:
-      - name: config
-        configMap:
-          name: elasticmq-config
-      - name: tmp
-        emptyDir: {}
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: elasticmq
-  namespace: platform-dev
-  labels:
-    app: elasticmq
-    component: queue
+    name: elasticmq
+    namespace: platform-dev
+    labels:
+      app: elasticmq
+      component: queue
 spec:
-  type: ClusterIP
-  ports:
-  - port: 9324
-    targetPort: 9324
-    protocol: TCP
-    name: sqs-api
-  - port: 9325
-    targetPort: 9325
-    protocol: TCP
-    name: web-ui
-  selector:
-    app: elasticmq
+    type: ClusterIP
+    ports:
+    - port: 9324
+      targetPort: 9324
+      protocol: TCP
+      name: sqs-api
+    - port: 9325
+      targetPort: 9325
+      protocol: TCP
+      name: web-ui
+    selector:
+      app: elasticmq
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: elasticmq-config
-  namespace: platform-dev
-  labels:
-    app: elasticmq
-    component: queue
+    name: elasticmq-config
+    namespace: platform-dev
+    labels:
+      app: elasticmq
+      component: queue
 data:
-  elasticmq.conf: |
-    include classpath("application.conf")
+    elasticmq.conf: |
+      include classpath("application.conf")
 
-    node-address {
-      protocol = http
-      host = "*"
-      port = 9324
-      context-path = ""
-    }
+      node-address {
+        protocol = http
+        host = "*"
+        port = 9324
+        context-path = ""
+      }
 
-    rest-sqs {
-      enabled = true
-      bind-port = 9324
-      bind-hostname = "0.0.0.0"
-      sqs-limits = strict
-    }
+      rest-sqs {
+        enabled = true
+        bind-port = 9324
+        bind-hostname = "0.0.0.0"
+        sqs-limits = strict
+      }
 
-    rest-stats {
-      enabled = true
-      bind-port = 9325
-      bind-hostname = "0.0.0.0"
-    }
+      rest-stats {
+        enabled = true
+        bind-port = 9325
+        bind-hostname = "0.0.0.0"
+      }
 
-    queues {
-      default {
-        defaultVisibilityTimeout = 10 seconds
-        delay = 5 seconds
-        receiveMessageWait = 0 seconds
-        deadLettersQueue {
-          name = "default-dlq"
-          maxReceiveCount = 3
+      queues {
+        default {
+          defaultVisibilityTimeout = 10 seconds
+          delay = 5 seconds
+          receiveMessageWait = 0 seconds
+          deadLettersQueue {
+            name = "default-dlq"
+            maxReceiveCount = 3
+          }
+        }
+
+        high-priority {
+          defaultVisibilityTimeout = 10 seconds
+          delay = 0 seconds
+          receiveMessageWait = 0 seconds
+        }
+
+        notifications {
+          defaultVisibilityTimeout = 30 seconds
+          delay = 0 seconds
+          receiveMessageWait = 0 seconds
+          deadLettersQueue {
+            name = "notifications-dlq"
+            maxReceiveCount = 5
+          }
+        }
+
+        # Dead letter queues
+        default-dlq {
+          defaultVisibilityTimeout = 30 seconds
+          delay = 0 seconds
+          receiveMessageWait = 0 seconds
+        }
+
+        notifications-dlq {
+          defaultVisibilityTimeout = 30 seconds
+          delay = 0 seconds
+          receiveMessageWait = 0 seconds
         }
       }
-
-      high-priority {
-        defaultVisibilityTimeout = 10 seconds
-        delay = 0 seconds
-        receiveMessageWait = 0 seconds
-      }
-
-      notifications {
-        defaultVisibilityTimeout = 30 seconds
-        delay = 0 seconds
-        receiveMessageWait = 0 seconds
-        deadLettersQueue {
-          name = "notifications-dlq"
-          maxReceiveCount = 5
-        }
-      }
-
-      # Dead letter queues
-      default-dlq {
-        defaultVisibilityTimeout = 30 seconds
-        delay = 0 seconds
-        receiveMessageWait = 0 seconds
-      }
-
-      notifications-dlq {
-        defaultVisibilityTimeout = 30 seconds
-        delay = 0 seconds
-        receiveMessageWait = 0 seconds
-      }
-    }
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: elasticmq
-  namespace: platform-dev
-  labels:
-    app: elasticmq
-    component: queue
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    name: elasticmq
+    namespace: platform-dev
+    labels:
+      app: elasticmq
+      component: queue
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
 spec:
-  ingressClassName: nginx
-  rules:
-  - host: elasticmq.dev.127.0.0.1.nip.io
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: elasticmq
-            port:
-              number: 9325
+    ingressClassName: nginx
+    rules:
+    - host: elasticmq.dev.127.0.0.1.nip.io
+      http:
+        paths:
+        - path: /
+          pathType: Prefix
+          backend:
+            service:
+              name: elasticmq
+              port:
+                number: 9325

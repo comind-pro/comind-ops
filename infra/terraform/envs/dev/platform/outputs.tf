@@ -75,7 +75,11 @@ output "dev_connection_info" {
       check_services   = "kubectl get services -A | grep -E '(sample-app|hello-world|analytics)'"
       check_ingress    = "kubectl get ingress -A | grep -E '(sample-app|hello-world|analytics)'"
     }
-  } : {}
+    } : {
+    kubectl_context = null
+    port_forwards   = {}
+    debug_commands  = {}
+  }
   sensitive = true
 }
 

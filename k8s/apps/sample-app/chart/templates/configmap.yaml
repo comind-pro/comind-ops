@@ -8,8 +8,7 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
 data:
   {{- range $key, $value := .Values.configMap }}
-  {{ $key }}: |
-{{ $value | indent 4 }}
+  {{ $key }}: {{ $value | quote }}
   {{- end }}
 
   # Platform service configuration

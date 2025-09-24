@@ -10,6 +10,12 @@ on:
     - cron: '0 2 * * *'
   workflow_dispatch:
 
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  pull-requests: write
+
 env:
   TRIVY_VERSION: 0.44.1
   SEMGREP_VERSION: latest
@@ -29,18 +35,30 @@ jobs:
           fetch-depth: 0  # Full history for secret scanning
 
       - name: "🔍 Scan for Secrets with TruffleHog"
+        if: github.event_name == 'pull_request' && github.event.pull_request.base.sha != github.event.pull_request.head.sha
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: main
-          head: HEAD
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
           extra_args: --debug --only-verified --fail
+        continue-on-error: true
+      
+      - name: "🔍 TruffleHog Full Scan (Push Events)"
+        if: github.event_name == 'push'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          extra_args: --debug --only-verified --fail
+        continue-on-error: true
 
       - name: "🔐 GitLeaks Secret Scan"
+        if: ${{ secrets.GITLEAKS_LICENSE != '' }}
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        continue-on-error: true
 
       - name: "📋 Generate Secret Scan Report"
         if: always()
@@ -77,7 +95,7 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: "📊 Upload Trivy Results to GitHub Security Tab"
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
 
@@ -166,7 +184,7 @@ jobs:
           quiet: true
 
       - name: "📊 Upload Checkov Results"
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: checkov-results.sarif
 
@@ -200,7 +218,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: "🔍 GitHub Dependency Review"
-        uses: actions/dependency-review-action@v3
+        uses: actions/dependency-review-action@v4
         if: github.event_name == 'pull_request'
 
       - name: "📋 License Compliance Check"

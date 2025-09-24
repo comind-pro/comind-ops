@@ -142,6 +142,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "app_buckets" {
     id     = "lifecycle_rule"
     status = "Enabled"
 
+    filter {}
+
     expiration {
       days = var.storage_buckets[count.index].config.lifecycle_expiration
     }
@@ -160,7 +162,7 @@ resource "aws_s3_bucket_cors_configuration" "app_buckets" {
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["GET", "HEAD", "PUT", "POST", "DELETE"]
-    allowed_origins = ["*"]
+    allowed_origins = ["https://*.${var.app_name}-${var.environment}.local"]
     max_age_seconds = 3000
   }
 }
@@ -170,10 +172,10 @@ resource "aws_s3_bucket_public_access_block" "app_buckets" {
 
   bucket = aws_s3_bucket.app_buckets[count.index].id
 
-  block_public_acls       = !var.storage_buckets[count.index].config.public_read
-  block_public_policy     = !var.storage_buckets[count.index].config.public_read
-  ignore_public_acls      = !var.storage_buckets[count.index].config.public_read
-  restrict_public_buckets = !var.storage_buckets[count.index].config.public_read
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 # DigitalOcean Spaces

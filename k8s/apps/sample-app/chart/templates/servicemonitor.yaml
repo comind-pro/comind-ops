@@ -1,41 +1,31 @@
-{{- if .Values.monitoring.serviceMonitor.enabled -}}
+{{- if and .Values.monitoring.enabled .Values.monitoring.serviceMonitor.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ include "sample-app.fullname" . }}
+  namespace: {{ .Values.namespace }}
   labels:
     {{- include "sample-app.labels" . | nindent 4 }}
     {{- with .Values.monitoring.serviceMonitor.labels }}
     {{- toYaml . | nindent 4 }}
     {{- end }}
+  {{- with .Values.monitoring.serviceMonitor.annotations }}
   annotations:
-    argocd.argoproj.io/sync-wave: "20"
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
+  endpoints:
+    - port: http
+      {{- with .Values.monitoring.serviceMonitor.interval }}
+      interval: {{ . }}
+      {{- end }}
+      {{- with .Values.monitoring.serviceMonitor.path }}
+      path: {{ . }}
+      {{- end }}
+      {{- with .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . }}
+      {{- end }}
   selector:
     matchLabels:
       {{- include "sample-app.selectorLabels" . | nindent 6 }}
-  endpoints:
-  - port: metrics
-    interval: {{ .Values.monitoring.serviceMonitor.interval }}
-    scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
-    path: /metrics
-    # Prometheus relabeling configuration
-    metricRelabelings:
-    - sourceLabels: [__name__]
-      regex: 'go_.*'
-      action: drop
-    - sourceLabels: [__name__]
-      regex: 'promhttp_.*'
-      action: drop
-    relabelings:
-    - sourceLabels: [__meta_kubernetes_pod_name]
-      targetLabel: pod
-    - sourceLabels: [__meta_kubernetes_pod_container_name]
-      targetLabel: container
-    - sourceLabels: [__meta_kubernetes_namespace]
-      targetLabel: namespace
-    - targetLabel: app
-      replacement: {{ include "sample-app.name" . }}
-    - targetLabel: version
-      replacement: {{ .Chart.AppVersion }}
 {{- end }}

@@ -1,6 +1,6 @@
-{{- if .Values.jobs }}
-{{- range .Values.jobs }}
-{{- if .enabled }}
+  {{- if .Values.jobs }}
+  {{- range .Values.jobs }}
+  {{- if .enabled }}
 ---
 apiVersion: batch/v1
 kind: Job
@@ -69,6 +69,6 @@ spec:
             - ALL
   backoffLimit: {{ .backoffLimit | default 3 }}
   ttlSecondsAfterFinished: 3600  # Clean up after 1 hour
-{{- end }}
-{{- end }}
-{{- end }}
+  {{- end }}
+  {{- end }}
+  {{- end }}

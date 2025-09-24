@@ -87,15 +87,18 @@ resource "null_resource" "kubeconfig" {
 }
 
 # Configure providers to use k3d cluster
+# In CI environments, skip provider configuration if kubeconfig doesn't exist
 provider "kubernetes" {
-  config_path    = "~/.kube/config"
-  config_context = "k3d-${var.cluster_name}"
+  # Only configure if not in CI or if kubeconfig exists
+  config_path    = fileexists(pathexpand("~/.kube/config")) ? "~/.kube/config" : null
+  config_context = fileexists(pathexpand("~/.kube/config")) ? "k3d-${var.cluster_name}" : null
 }
 
 provider "helm" {
   kubernetes {
-    config_path    = "~/.kube/config"
-    config_context = "k3d-${var.cluster_name}"
+    # Only configure if not in CI or if kubeconfig exists  
+    config_path    = fileexists(pathexpand("~/.kube/config")) ? "~/.kube/config" : null
+    config_context = fileexists(pathexpand("~/.kube/config")) ? "k3d-${var.cluster_name}" : null
   }
 }
 

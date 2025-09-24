@@ -18,8 +18,8 @@ Complete cloud-native platform built on Kubernetes, featuring automated GitOps w
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-org/comind-ops-cloud-setup.git
-cd comind-ops-cloud-setup
+git clone git@github.com:comind-pro/comind-ops.git
+cd comind-ops
 
 # 2. Bootstrap the platform (one command setup!)
 make bootstrap

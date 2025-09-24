@@ -3,267 +3,267 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: minio-backup
-  namespace: backup-system
-  labels:
-    app: minio-backup
-    component: backup
+    name: minio-backup
+    namespace: backup-system
+    labels:
+      app: minio-backup
+      component: backup
 spec:
-  schedule: "0 4 * * *"  # Daily at 4 AM
-  concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 7
-  failedJobsHistoryLimit: 3
-  jobTemplate:
-    spec:
-      template:
-        metadata:
-          labels:
-            app: minio-backup
-            component: backup
-        spec:
-          serviceAccountName: backup-operator
-          restartPolicy: OnFailure
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            fsGroup: 1000
-          containers:
-          - name: minio-backup
-            image: minio/mc:latest
-            imagePullPolicy: IfNotPresent
-            command: ["/bin/sh"]
-            args:
-            - -c
-            - |
-              set -e
+    schedule: "0 4 * * *"  # Daily at 4 AM
+    concurrencyPolicy: Forbid
+    successfulJobsHistoryLimit: 7
+    failedJobsHistoryLimit: 3
+    jobTemplate:
+      spec:
+        template:
+          metadata:
+            labels:
+              app: minio-backup
+              component: backup
+          spec:
+            serviceAccountName: backup-operator
+            restartPolicy: OnFailure
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1000
+              fsGroup: 1000
+            containers:
+            - name: minio-backup
+              image: minio/mc:latest
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh"]
+              args:
+              - -c
+              - |
+                set -e
 
-              # Backup configuration
-              BACKUP_NAME="minio-backup-$(date +%Y%m%d-%H%M%S)"
-              BACKUP_PATH="/backups/${BACKUP_NAME}"
-              RETENTION_DAYS=${RETENTION_DAYS:-7}
+                # Backup configuration
+                BACKUP_NAME="minio-backup-$(date +%Y%m%d-%H%M%S)"
+                BACKUP_PATH="/backups/${BACKUP_NAME}"
+                RETENTION_DAYS=${RETENTION_DAYS:-7}
 
-              echo "Starting MinIO backup: $BACKUP_NAME"
-              echo "Timestamp: $(date)"
-              echo "Retention: $RETENTION_DAYS days"
+                echo "Starting MinIO backup: $BACKUP_NAME"
+                echo "Timestamp: $(date)"
+                echo "Retention: $RETENTION_DAYS days"
 
-              # Configure MinIO client for source and destination
-              mc alias set source "$MINIO_SOURCE_ENDPOINT" "$MINIO_SOURCE_ACCESS_KEY" "$MINIO_SOURCE_SECRET_KEY"
+                # Configure MinIO client for source and destination
+                mc alias set source "$MINIO_SOURCE_ENDPOINT" "$MINIO_SOURCE_ACCESS_KEY" "$MINIO_SOURCE_SECRET_KEY"
 
-              # Configure backup destination (could be external S3, another MinIO, etc.)
-              if [ -n "$BACKUP_ENDPOINT" ]; then
-                mc alias set backup "$BACKUP_ENDPOINT" "$BACKUP_ACCESS_KEY" "$BACKUP_SECRET_KEY"
-                BACKUP_DEST="backup"
-              else
-                # Local backup to mounted volume
-                BACKUP_DEST="$BACKUP_PATH"
-                mkdir -p "$BACKUP_DEST"
-              fi
-
-              # Get list of buckets to backup
-              BUCKETS=$(mc ls source/ | awk '{print $5}' | grep -v '^$')
-
-              if [ -z "$BUCKETS" ]; then
-                echo "No buckets found to backup"
-                exit 0
-              fi
-
-              echo "Found buckets to backup: $BUCKETS"
-
-              # Create backup metadata
-              cat > "/tmp/backup-metadata.json" << EOF
-              {
-                "timestamp": "$(date -Iseconds)",
-                "backup_name": "$BACKUP_NAME",
-                "source_endpoint": "$MINIO_SOURCE_ENDPOINT",
-                "backup_type": "incremental",
-                "buckets": [
-              EOF
-
-              FIRST_BUCKET=true
-              TOTAL_SIZE=0
-
-              for bucket in $BUCKETS; do
-                echo "Backing up bucket: $bucket"
-
-                # Add bucket to metadata (JSON formatting)
-                if [ "$FIRST_BUCKET" = "true" ]; then
-                  FIRST_BUCKET=false
+                # Configure backup destination (could be external S3, another MinIO, etc.)
+                if [ -n "$BACKUP_ENDPOINT" ]; then
+                  mc alias set backup "$BACKUP_ENDPOINT" "$BACKUP_ACCESS_KEY" "$BACKUP_SECRET_KEY"
+                  BACKUP_DEST="backup"
                 else
-                  echo "," >> /tmp/backup-metadata.json
+                  # Local backup to mounted volume
+                  BACKUP_DEST="$BACKUP_PATH"
+                  mkdir -p "$BACKUP_DEST"
                 fi
-                echo "      \"$bucket\"" >> /tmp/backup-metadata.json
+
+                # Get list of buckets to backup
+                BUCKETS=$(mc ls source/ | awk '{print $5}' | grep -v '^$')
+
+                if [ -z "$BUCKETS" ]; then
+                  echo "No buckets found to backup"
+                  exit 0
+                fi
+
+                echo "Found buckets to backup: $BUCKETS"
+
+                # Create backup metadata
+                cat > "/tmp/backup-metadata.json" << EOF
+                {
+                  "timestamp": "$(date -Iseconds)",
+                  "backup_name": "$BACKUP_NAME",
+                  "source_endpoint": "$MINIO_SOURCE_ENDPOINT",
+                  "backup_type": "incremental",
+                  "buckets": [
+                EOF
+
+                FIRST_BUCKET=true
+                TOTAL_SIZE=0
+
+                for bucket in $BUCKETS; do
+                  echo "Backing up bucket: $bucket"
+
+                  # Add bucket to metadata (JSON formatting)
+                  if [ "$FIRST_BUCKET" = "true" ]; then
+                    FIRST_BUCKET=false
+                  else
+                    echo "," >> /tmp/backup-metadata.json
+                  fi
+                  echo "      \"$bucket\"" >> /tmp/backup-metadata.json
+
+                  if [ -n "$BACKUP_ENDPOINT" ]; then
+                    # Mirror to external storage
+                    echo "Mirroring $bucket to external backup storage..."
+                    mc mirror source/$bucket backup/$MINIO_BACKUP_BUCKET/minio-backups/$BACKUP_NAME/$bucket --overwrite
+                  else
+                    # Copy to local backup volume
+                    echo "Copying $bucket to local backup storage..."
+                    mc mirror source/$bucket $BACKUP_DEST/$bucket --overwrite
+                  fi
+
+                  # Calculate bucket size
+                  BUCKET_SIZE=$(mc du source/$bucket --json | jq -r '.size' | awk '{sum += $1} END {print sum}')
+                  TOTAL_SIZE=$((TOTAL_SIZE + BUCKET_SIZE))
+
+                  echo "Bucket $bucket backup completed (Size: $(echo $BUCKET_SIZE | numfmt --to=iec))"
+                done
+
+                # Complete backup metadata
+                cat >> /tmp/backup-metadata.json << EOF
+                  ],
+                  "total_size_bytes": $TOTAL_SIZE,
+                  "total_size_human": "$(echo $TOTAL_SIZE | numfmt --to=iec)",
+                  "status": "completed"
+                }
+                EOF
+
+                # Save metadata
+                if [ -n "$BACKUP_ENDPOINT" ]; then
+                  mc cp /tmp/backup-metadata.json backup/$MINIO_BACKUP_BUCKET/minio-backups/$BACKUP_NAME/metadata.json
+                else
+                  cp /tmp/backup-metadata.json $BACKUP_DEST/metadata.json
+                fi
+
+                echo "Backup metadata created"
+
+                # Clean up old backups
+                echo "Cleaning up backups older than $RETENTION_DAYS days..."
 
                 if [ -n "$BACKUP_ENDPOINT" ]; then
-                  # Mirror to external storage
-                  echo "Mirroring $bucket to external backup storage..."
-                  mc mirror source/$bucket backup/$MINIO_BACKUP_BUCKET/minio-backups/$BACKUP_NAME/$bucket --overwrite
+                  # Clean up external backups
+                  OLD_BACKUPS=$(mc find backup/$MINIO_BACKUP_BUCKET/minio-backups/ --name "minio-backup-*" --older-than "${RETENTION_DAYS}d" | head -n 10)
+                  for old_backup in $OLD_BACKUPS; do
+                    echo "Removing old backup: $old_backup"
+                    mc rm -r "$old_backup" --force || true
+                  done
                 else
-                  # Copy to local backup volume
-                  echo "Copying $bucket to local backup storage..."
-                  mc mirror source/$bucket $BACKUP_DEST/$bucket --overwrite
+                  # Clean up local backups
+                  find /backups -name "minio-backup-*" -type d -mtime +$RETENTION_DAYS -exec rm -rf {} \; || true
                 fi
 
-                # Calculate bucket size
-                BUCKET_SIZE=$(mc du source/$bucket --json | jq -r '.size' | awk '{sum += $1} END {print sum}')
-                TOTAL_SIZE=$((TOTAL_SIZE + BUCKET_SIZE))
+                echo "MinIO backup completed successfully at $(date)"
+                echo "Total backup size: $(echo $TOTAL_SIZE | numfmt --to=iec)"
 
-                echo "Bucket $bucket backup completed (Size: $(echo $BUCKET_SIZE | numfmt --to=iec))"
-              done
+              env:
+              # Source MinIO configuration
+              - name: MINIO_SOURCE_ENDPOINT
+                valueFrom:
+                  configMapKeyRef:
+                    name: minio-backup-config
+                    key: source-endpoint
+              - name: MINIO_SOURCE_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: minio-backup-secrets
+                    key: source-access-key
+              - name: MINIO_SOURCE_SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: minio-backup-secrets
+                    key: source-secret-key
 
-              # Complete backup metadata
-              cat >> /tmp/backup-metadata.json << EOF
-                ],
-                "total_size_bytes": $TOTAL_SIZE,
-                "total_size_human": "$(echo $TOTAL_SIZE | numfmt --to=iec)",
-                "status": "completed"
-              }
-              EOF
-
-              # Save metadata
-              if [ -n "$BACKUP_ENDPOINT" ]; then
-                mc cp /tmp/backup-metadata.json backup/$MINIO_BACKUP_BUCKET/minio-backups/$BACKUP_NAME/metadata.json
-              else
-                cp /tmp/backup-metadata.json $BACKUP_DEST/metadata.json
-              fi
-
-              echo "Backup metadata created"
-
-              # Clean up old backups
-              echo "Cleaning up backups older than $RETENTION_DAYS days..."
-
-              if [ -n "$BACKUP_ENDPOINT" ]; then
-                # Clean up external backups
-                OLD_BACKUPS=$(mc find backup/$MINIO_BACKUP_BUCKET/minio-backups/ --name "minio-backup-*" --older-than "${RETENTION_DAYS}d" | head -n 10)
-                for old_backup in $OLD_BACKUPS; do
-                  echo "Removing old backup: $old_backup"
-                  mc rm -r "$old_backup" --force || true
-                done
-              else
-                # Clean up local backups
-                find /backups -name "minio-backup-*" -type d -mtime +$RETENTION_DAYS -exec rm -rf {} \; || true
-              fi
-
-              echo "MinIO backup completed successfully at $(date)"
-              echo "Total backup size: $(echo $TOTAL_SIZE | numfmt --to=iec)"
-
-            env:
-            # Source MinIO configuration
-            - name: MINIO_SOURCE_ENDPOINT
-              valueFrom:
-                configMapKeyRef:
-                  name: minio-backup-config
-                  key: source-endpoint
-            - name: MINIO_SOURCE_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: minio-backup-secrets
-                  key: source-access-key
-            - name: MINIO_SOURCE_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: minio-backup-secrets
-                  key: source-secret-key
-
-            # Backup destination configuration (optional - external storage)
-            - name: BACKUP_ENDPOINT
-              valueFrom:
-                configMapKeyRef:
-                  name: minio-backup-config
-                  key: backup-endpoint
-                  optional: true
-            - name: BACKUP_ACCESS_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: minio-backup-secrets
-                  key: backup-access-key
-                  optional: true
-            - name: BACKUP_SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: minio-backup-secrets
-                  key: backup-secret-key
-                  optional: true
-            - name: MINIO_BACKUP_BUCKET
-              valueFrom:
-                configMapKeyRef:
-                  name: minio-backup-config
-                  key: backup-bucket
-                  optional: true
-            - name: RETENTION_DAYS
-              valueFrom:
-                configMapKeyRef:
-                  name: minio-backup-config
-                  key: retention-days
-                  optional: true
-            securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: true
-              capabilities:
-                drop:
-                - ALL
-            resources:
-              requests:
-                memory: "256Mi"
-                cpu: "100m"
-              limits:
-                memory: "1Gi"
-                cpu: "500m"
-            volumeMounts:
+              # Backup destination configuration (optional - external storage)
+              - name: BACKUP_ENDPOINT
+                valueFrom:
+                  configMapKeyRef:
+                    name: minio-backup-config
+                    key: backup-endpoint
+                    optional: true
+              - name: BACKUP_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: minio-backup-secrets
+                    key: backup-access-key
+                    optional: true
+              - name: BACKUP_SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: minio-backup-secrets
+                    key: backup-secret-key
+                    optional: true
+              - name: MINIO_BACKUP_BUCKET
+                valueFrom:
+                  configMapKeyRef:
+                    name: minio-backup-config
+                    key: backup-bucket
+                    optional: true
+              - name: RETENTION_DAYS
+                valueFrom:
+                  configMapKeyRef:
+                    name: minio-backup-config
+                    key: retention-days
+                    optional: true
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop:
+                  - ALL
+              resources:
+                requests:
+                  memory: "256Mi"
+                  cpu: "100m"
+                limits:
+                  memory: "1Gi"
+                  cpu: "500m"
+              volumeMounts:
+              - name: backup-storage
+                mountPath: /backups
+              - name: tmp
+                mountPath: /tmp
+            volumes:
             - name: backup-storage
-              mountPath: /backups
+              persistentVolumeClaim:
+                claimName: minio-backup-storage
             - name: tmp
-              mountPath: /tmp
-          volumes:
-          - name: backup-storage
-            persistentVolumeClaim:
-              claimName: minio-backup-storage
-          - name: tmp
-            emptyDir: {}
+              emptyDir: {}
 ---
 # MinIO Backup Storage PVC
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: minio-backup-storage
-  namespace: backup-system
-  labels:
-    app: minio-backup
-    component: storage
+    name: minio-backup-storage
+    namespace: backup-system
+    labels:
+      app: minio-backup
+      component: storage
 spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 50Gi
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 50Gi
 ---
 # MinIO Backup Configuration
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: minio-backup-config
-  namespace: backup-system
-  labels:
-    app: minio-backup
-    component: config
+    name: minio-backup-config
+    namespace: backup-system
+    labels:
+      app: minio-backup
+      component: config
 data:
-  source-endpoint: "http://minio.platform-dev.svc.cluster.local:9000"
-  retention-days: "7"
-  # Optional external backup storage
-  # backup-endpoint: "https://s3.amazonaws.com"
-  # backup-bucket: "my-backup-bucket"
+    source-endpoint: "http://minio.platform-dev.svc.cluster.local:9000"
+    retention-days: "7"
+    # Optional external backup storage
+    # backup-endpoint: "https://s3.amazonaws.com"
+    # backup-bucket: "my-backup-bucket"
 ---
 # MinIO Backup Secrets Template (to be sealed)
 apiVersion: v1
 kind: Secret
 metadata:
-  name: minio-backup-secrets-template
-  namespace: backup-system
-  annotations:
-    template: "true"
+    name: minio-backup-secrets-template
+    namespace: backup-system
+    annotations:
+      template: "true"
 type: Opaque
 stringData:
-  source-access-key: "minio-access-key"
-  source-secret-key: "minio-secret-key"
-  # Optional external backup credentials
-  # backup-access-key: "external-access-key"
-  # backup-secret-key: "external-secret-key"
+    source-access-key: "minio-access-key"
+    source-secret-key: "minio-secret-key"
+    # Optional external backup credentials
+    # backup-access-key: "external-access-key"
+    # backup-secret-key: "external-secret-key"

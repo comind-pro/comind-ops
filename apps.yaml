@@ -3,7 +3,7 @@
 
 environments:
   - name: dev
-  - name: stage  
+  - name: stage
   - name: prod
 
 # Application definitions
@@ -16,13 +16,13 @@ apps:
     syncWave: 10
     description: "Sample application demonstrating the comind-ops platform patterns"
     team: platform
-    
+
     # Helm configuration
     helm:
       values:
         - k8s/apps/sample-app/values/{{env}}.yaml
         - k8s/apps/sample-app/secrets/{{env}}.sealed.yaml
-    
+
     # Environment-specific overrides
     environments:
       dev:
@@ -50,32 +50,32 @@ infrastructure:
     type: kustomize
     syncWave: -10
     description: "Base Kubernetes resources (RBAC, quotas, policies)"
-    
-  # Platform services per environment  
+
+  # Platform services per environment
   - name: platform-services
     path: k8s/platform
     type: kustomize
     syncWave: 0
     environments: [dev, stage, prod]
     description: "Platform services (ElasticMQ, Docker Registry, Backups)"
-    
+
     services:
       - name: elasticmq
         port: 9324
         ingress: elasticmq.{{env}}.127.0.0.1.nip.io
         description: "AWS SQS-compatible message queue"
-        
+
       - name: docker-registry
         port: 5000
         ingress: registry.{{env}}.127.0.0.1.nip.io
         description: "Private container registry with retention"
-        
+
       - name: postgres-backup
         schedule: "0 3 * * *"
         description: "Automated PostgreSQL backup service"
-        
+
       - name: minio-backup
-        schedule: "0 4 * * *" 
+        schedule: "0 4 * * *"
         description: "Automated MinIO backup service"
 
 # Example of how to add more applications
@@ -87,13 +87,13 @@ infrastructure:
 #   syncWave: 20
 #   description: "My custom API service"
 #   team: backend
-#   
+#
 #   environments:
 #     dev:
 #       replicas: 1
 #       database: postgres.dev.local
 #     stage:
-#       replicas: 1  
+#       replicas: 1
 #       database: postgres.stage.local
 #     prod:
 #       replicas: 3
@@ -101,11 +101,11 @@ infrastructure:
 
 # - name: my-frontend
 #   path: k8s/apps/my-frontend/chart
-#   namespace: my-frontend  
+#   namespace: my-frontend
 #   syncWave: 30
 #   description: "My frontend application"
 #   team: frontend
-#   
+#
 #   environments:
 #     dev:
 #       replicas: 1

@@ -3,250 +3,250 @@
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: comind-ops-platform-apps
-  namespace: argocd
-  labels:
-    app.kubernetes.io/name: comind-ops-platform-apps
-    app.kubernetes.io/component: applicationset
+    name: comind-ops-platform-apps
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: comind-ops-platform-apps
+      app.kubernetes.io/component: applicationset
 spec:
-  # Generators combine apps and environments from apps.yaml
-  generators:
-  # Matrix generator to combine apps with environments
-  - matrix:
-      generators:
-      # Git files generator - reads apps.yaml from the repository
-      - git:
+    # Generators combine apps and environments from apps.yaml
+    generators:
+    # Matrix generator to combine apps with environments
+    - matrix:
+        generators:
+        # Git files generator - reads apps.yaml from the repository
+        - git:
+            repoURL: https://github.com/your-org/comind-ops-cloud-setup
+            revision: HEAD
+            files:
+            - path: apps.yaml
+
+        # List generator for environments
+        - list:
+            elements:
+            - env: dev
+              namespace: platform-dev
+              domain: dev.127.0.0.1.nip.io
+              replicas: "1"
+              resources: small
+            - env: stage
+              namespace: platform-stage
+              domain: stage.127.0.0.1.nip.io
+              replicas: "1"
+              resources: medium
+            - env: prod
+              namespace: platform-prod
+              domain: prod.127.0.0.1.nip.io
+              replicas: "2"
+              resources: large
+
+    # Template for creating ArgoCD Applications
+    template:
+      metadata:
+        name: '{{apps.name}}-{{env}}'
+        labels:
+          app.kubernetes.io/name: '{{apps.name}}'
+          app.kubernetes.io/instance: '{{apps.name}}-{{env}}'
+          app.kubernetes.io/component: application
+          environment: '{{env}}'
+          managed-by: applicationset
+        annotations:
+          argocd.argoproj.io/sync-wave: "{{apps.syncWave | default('0')}}"
+
+      spec:
+        # Project configuration
+        project: default
+
+        # Source configuration
+        source:
           repoURL: https://github.com/your-org/comind-ops-cloud-setup
-          revision: HEAD
-          files:
-          - path: apps.yaml
+          targetRevision: HEAD
+          path: '{{apps.path}}'
 
-      # List generator for environments
-      - list:
-          elements:
-          - env: dev
-            namespace: platform-dev
-            domain: dev.127.0.0.1.nip.io
-            replicas: "1"
-            resources: small
-          - env: stage
-            namespace: platform-stage
-            domain: stage.127.0.0.1.nip.io
-            replicas: "1"
-            resources: medium
-          - env: prod
-            namespace: platform-prod
-            domain: prod.127.0.0.1.nip.io
-            replicas: "2"
-            resources: large
+          # Helm configuration
+          helm:
+            # Values files in order of precedence
+            valueFiles:
+            - '../values/{{env}}.yaml'
+            - '../secrets/{{env}}.sealed.yaml'
 
-  # Template for creating ArgoCD Applications
-  template:
-    metadata:
-      name: '{{apps.name}}-{{env}}'
-      labels:
-        app.kubernetes.io/name: '{{apps.name}}'
-        app.kubernetes.io/instance: '{{apps.name}}-{{env}}'
-        app.kubernetes.io/component: application
-        environment: '{{env}}'
-        managed-by: applicationset
-      annotations:
-        argocd.argoproj.io/sync-wave: "{{apps.syncWave | default "0"}}"
+            # Additional helm parameters
+            parameters:
+            - name: global.environment
+              value: '{{env}}'
+            - name: global.namespace
+              value: '{{namespace}}'
+            - name: global.domain
+              value: '{{domain}}'
+            - name: replicaCount
+              value: '{{replicas}}'
+            - name: resources.profile
+              value: '{{resources}}'
 
-    spec:
-      # Project configuration
-      project: default
+            # Release name
+            releaseName: '{{apps.name}}'
 
-      # Source configuration
-      source:
-        repoURL: https://github.com/your-org/comind-ops-cloud-setup
-        targetRevision: HEAD
-        path: '{{apps.path}}'
+        # Destination configuration
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: '{{namespace}}'
 
-        # Helm configuration
-        helm:
-          # Values files in order of precedence
-          valueFiles:
-          - '../values/{{env}}.yaml'
-          - '../secrets/{{env}}.sealed.yaml'
+        # Sync policy
+        syncPolicy:
+          # Automated sync
+          automated:
+            prune: true
+            selfHeal: true
+            allowEmpty: false
 
-          # Additional helm parameters
-          parameters:
-          - name: global.environment
-            value: '{{env}}'
-          - name: global.namespace
-            value: '{{namespace}}'
-          - name: global.domain
-            value: '{{domain}}'
-          - name: replicaCount
-            value: '{{replicas}}'
-          - name: resources.profile
-            value: '{{resources}}'
+          # Sync options
+          syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - PrunePropagationPolicy=foreground
+          - RespectIgnoreDifferences=true
 
-          # Release name
-          releaseName: '{{apps.name}}'
+          # Retry configuration
+          retry:
+            limit: 5
+            backoff:
+              duration: 5s
+              factor: 2
+              maxDuration: 3m
 
-      # Destination configuration
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: '{{namespace}}'
-
-      # Sync policy
-      syncPolicy:
-        # Automated sync
-        automated:
-          prune: true
-          selfHeal: true
-          allowEmpty: false
-
-        # Sync options
-        syncOptions:
-        - CreateNamespace=true
-        - PruneLast=true
-        - PrunePropagationPolicy=foreground
-        - RespectIgnoreDifferences=true
-
-        # Retry configuration
-        retry:
-          limit: 5
-          backoff:
-            duration: 5s
-            factor: 2
-            maxDuration: 3m
-
-      # Ignore differences for certain fields
-      ignoreDifferences:
-      - group: apps
-        kind: Deployment
-        jsonPointers:
-        - /spec/replicas
-      - group: ""
-        kind: Service
-        jsonPointers:
-        - /spec/clusterIP
-        - /spec/clusterIPs
+        # Ignore differences for certain fields
+        ignoreDifferences:
+        - group: apps
+          kind: Deployment
+          jsonPointers:
+          - /spec/replicas
+        - group: ""
+          kind: Service
+          jsonPointers:
+          - /spec/clusterIP
+          - /spec/clusterIPs
 
 ---
 # ApplicationSet for Platform Infrastructure Services
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: comind-ops-platform-infrastructure
-  namespace: argocd
-  labels:
-    app.kubernetes.io/name: comind-ops-platform-infrastructure
-    app.kubernetes.io/component: applicationset
+    name: comind-ops-platform-infrastructure
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: comind-ops-platform-infrastructure
+      app.kubernetes.io/component: applicationset
 spec:
-  # List generator for infrastructure components
-  generators:
-  - list:
-      elements:
-      # Base Kubernetes resources
-      - name: k8s-base
-        path: k8s/base
-        namespace: default
-        env: all
-        syncWave: "-10"
+    # List generator for infrastructure components
+    generators:
+    - list:
+        elements:
+        # Base Kubernetes resources
+        - name: k8s-base
+          path: k8s/base
+          namespace: default
+          env: all
+          syncWave: "-10"
 
-      # Platform services per environment
-      - name: platform-services-dev
-        path: k8s/platform
-        namespace: platform-dev
-        env: dev
-        syncWave: "0"
+        # Platform services per environment
+        - name: platform-services-dev
+          path: k8s/platform
+          namespace: platform-dev
+          env: dev
+          syncWave: "0"
 
-      - name: platform-services-stage
-        path: k8s/platform
-        namespace: platform-stage
-        env: stage
-        syncWave: "0"
+        - name: platform-services-stage
+          path: k8s/platform
+          namespace: platform-stage
+          env: stage
+          syncWave: "0"
 
-      - name: platform-services-prod
-        path: k8s/platform
-        namespace: platform-prod
-        env: prod
-        syncWave: "0"
+        - name: platform-services-prod
+          path: k8s/platform
+          namespace: platform-prod
+          env: prod
+          syncWave: "0"
 
-  # Template for infrastructure applications
-  template:
-    metadata:
-      name: '{{name}}'
-      labels:
-        app.kubernetes.io/name: '{{name}}'
-        app.kubernetes.io/component: infrastructure
-        environment: '{{env}}'
-        managed-by: applicationset
-      annotations:
-        argocd.argoproj.io/sync-wave: '{{syncWave}}'
+    # Template for infrastructure applications
+    template:
+      metadata:
+        name: '{{name}}'
+        labels:
+          app.kubernetes.io/name: '{{name}}'
+          app.kubernetes.io/component: infrastructure
+          environment: '{{env}}'
+          managed-by: applicationset
+        annotations:
+          argocd.argoproj.io/sync-wave: '{{syncWave}}'
 
-    spec:
-      project: default
+      spec:
+        project: default
 
-      source:
-        repoURL: https://github.com/your-org/comind-ops-cloud-setup
-        targetRevision: HEAD
-        path: '{{path}}'
+        source:
+          repoURL: https://github.com/your-org/comind-ops-cloud-setup
+          targetRevision: HEAD
+          path: '{{path}}'
 
-        # Use Kustomize for infrastructure
-        kustomize:
-          commonLabels:
-            managed-by: argocd
-            environment: '{{env}}'
+          # Use Kustomize for infrastructure
+          kustomize:
+            commonLabels:
+              managed-by: argocd
+              environment: '{{env}}'
 
-      destination:
-        server: https://kubernetes.default.svc
-        namespace: '{{namespace}}'
+        destination:
+          server: https://kubernetes.default.svc
+          namespace: '{{namespace}}'
 
-      syncPolicy:
-        automated:
-          prune: true
-          selfHeal: true
-        syncOptions:
-        - CreateNamespace=true
-        - PruneLast=true
-        - ApplyOutOfSyncOnly=true
+        syncPolicy:
+          automated:
+            prune: true
+            selfHeal: true
+          syncOptions:
+          - CreateNamespace=true
+          - PruneLast=true
+          - ApplyOutOfSyncOnly=true
 
-        retry:
-          limit: 3
-          backoff:
-            duration: 5s
-            factor: 2
-            maxDuration: 3m
+          retry:
+            limit: 3
+            backoff:
+              duration: 5s
+              factor: 2
+              maxDuration: 3m
 
 ---
 # App of Apps Pattern - Root Application
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: comind-ops-platform-root
-  namespace: argocd
-  labels:
-    app.kubernetes.io/name: comind-ops-platform-root
-    app.kubernetes.io/component: root-app
-  finalizers:
-  - resources-finalizer.argocd.argoproj.io
-spec:
-  project: default
-
-  source:
-    repoURL: https://github.com/your-org/comind-ops-cloud-setup
-    targetRevision: HEAD
-    path: argo/apps
-
-  destination:
-    server: https://kubernetes.default.svc
+    name: comind-ops-platform-root
     namespace: argocd
+    labels:
+      app.kubernetes.io/name: comind-ops-platform-root
+      app.kubernetes.io/component: root-app
+    finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+    project: default
 
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-    - CreateNamespace=true
+    source:
+      repoURL: https://github.com/your-org/comind-ops-cloud-setup
+      targetRevision: HEAD
+      path: argo/apps
 
-  # This application manages ApplicationSets
-  info:
-  - name: Description
-    value: "Root application that manages all ApplicationSets for the comind-ops platform"
-  - name: Documentation
-    value: "https://github.com/your-org/comind-ops-cloud-setup/blob/main/docs/README.md"
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: argocd
+
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+      syncOptions:
+      - CreateNamespace=true
+
+    # This application manages ApplicationSets
+    info:
+    - name: Description
+      value: "Root application that manages all ApplicationSets for the comind-ops platform"
+    - name: Documentation
+      value: "https://github.com/your-org/comind-ops-cloud-setup/blob/main/docs/README.md"

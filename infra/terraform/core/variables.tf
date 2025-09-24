@@ -35,3 +35,13 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
+variable "cluster_type" {
+  description = "Type of cluster deployment (local, aws, digitalocean)"
+  type        = string
+  default     = "local"
+  validation {
+    condition     = contains(["local", "aws", "digitalocean"], var.cluster_type)
+    error_message = "Cluster type must be one of: local, aws, digitalocean."
+  }
+}

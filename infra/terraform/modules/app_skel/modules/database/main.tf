@@ -107,6 +107,9 @@ resource "aws_db_instance" "postgresql" {
   password = var.database_password
   port     = 5432
 
+  # Logging configuration
+  enabled_cloudwatch_logs_exports = ["postgresql"]
+
   # Network configuration
   vpc_security_group_ids = var.security_group_ids
   db_subnet_group_name   = var.db_subnet_group_name
@@ -121,7 +124,7 @@ resource "aws_db_instance" "postgresql" {
   multi_az = var.database_config.multi_az
 
   # Monitoring
-  monitoring_interval = 60
+  monitoring_interval = var.database_config.monitoring_interval
   monitoring_role_arn = var.monitoring_role_arn
 
   performance_insights_enabled          = var.environment == "prod"

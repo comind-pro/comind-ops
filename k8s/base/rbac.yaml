@@ -13,14 +13,14 @@ metadata:
   name: backup-operator
 rules:
   - apiGroups: [""]
-  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "persistentvolumes"]
-  verbs: ["get", "list", "watch"]
+    resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "persistentvolumes"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: ["apps"]
-  resources: ["deployments", "statefulsets", "daemonsets"]
-  verbs: ["get", "list", "watch"]
+    resources: ["deployments", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
-  resources: ["secrets", "configmaps"]
-  verbs: ["get", "list"]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "list"]
 ---
 # ClusterRoleBinding for backup operations
 apiVersion: rbac.authorization.k8s.io/v1
@@ -63,17 +63,17 @@ metadata:
   namespace: platform-dev
 rules:
   - apiGroups: [""]
-  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
-  verbs: ["*"]
+    resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
+    verbs: ["*"]
   - apiGroups: ["apps"]
-  resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
-  verbs: ["*"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["*"]
   - apiGroups: ["extensions", "networking.k8s.io"]
-  resources: ["ingresses"]
-  verbs: ["*"]
+    resources: ["ingresses"]
+    verbs: ["*"]
   - apiGroups: ["batch"]
-  resources: ["jobs", "cronjobs"]
-  verbs: ["*"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["*"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -82,17 +82,17 @@ metadata:
   namespace: platform-stage
 rules:
   - apiGroups: [""]
-  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
-  verbs: ["*"]
+    resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
+    verbs: ["*"]
   - apiGroups: ["apps"]
-  resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
-  verbs: ["*"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["*"]
   - apiGroups: ["extensions", "networking.k8s.io"]
-  resources: ["ingresses"]
-  verbs: ["*"]
+    resources: ["ingresses"]
+    verbs: ["*"]
   - apiGroups: ["batch"]
-  resources: ["jobs", "cronjobs"]
-  verbs: ["*"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["*"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -101,17 +101,17 @@ metadata:
   namespace: platform-prod
 rules:
   - apiGroups: [""]
-  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
-  verbs: ["*"]
+    resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
+    verbs: ["*"]
   - apiGroups: ["apps"]
-  resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
-  verbs: ["*"]
+    resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+    verbs: ["*"]
   - apiGroups: ["extensions", "networking.k8s.io"]
-  resources: ["ingresses"]
-  verbs: ["*"]
+    resources: ["ingresses"]
+    verbs: ["*"]
   - apiGroups: ["batch"]
-  resources: ["jobs", "cronjobs"]
-  verbs: ["*"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["*"]
 ---
 # RoleBindings for app deployer
 apiVersion: rbac.authorization.k8s.io/v1

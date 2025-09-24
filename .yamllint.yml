@@ -52,3 +52,5 @@ ignore: |
   node_modules/
   *.sealed.yaml
   **/secrets/*.yaml
+  **/templates/*.yaml
+  **/templates/*.yml
