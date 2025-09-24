@@ -1,0 +1,158 @@
+---
+# Service Account for backup operations
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backup-operator
+  namespace: backup-system
+---
+# ClusterRole for backup operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: backup-operator
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "persistentvolumes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets", "configmaps"]
+  verbs: ["get", "list"]
+---
+# ClusterRoleBinding for backup operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: backup-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: backup-operator
+subjects:
+- kind: ServiceAccount
+  name: backup-operator
+  namespace: backup-system
+---
+# Service Account for application deployments
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-deployer
+  namespace: platform-dev
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-deployer
+  namespace: platform-stage
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app-deployer
+  namespace: platform-prod
+---
+# Role for application deployments within namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: app-deployer
+  namespace: platform-dev
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
+  verbs: ["*"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+  verbs: ["*"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["*"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: app-deployer
+  namespace: platform-stage
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
+  verbs: ["*"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+  verbs: ["*"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["*"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: app-deployer
+  namespace: platform-prod
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
+  verbs: ["*"]
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
+  verbs: ["*"]
+- apiGroups: ["extensions", "networking.k8s.io"]
+  resources: ["ingresses"]
+  verbs: ["*"]
+- apiGroups: ["batch"]
+  resources: ["jobs", "cronjobs"]
+  verbs: ["*"]
+---
+# RoleBindings for app deployer
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: app-deployer
+  namespace: platform-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: app-deployer
+subjects:
+- kind: ServiceAccount
+  name: app-deployer
+  namespace: platform-dev
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: app-deployer
+  namespace: platform-stage
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: app-deployer
+subjects:
+- kind: ServiceAccount
+  name: app-deployer
+  namespace: platform-stage
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: app-deployer
+  namespace: platform-prod
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: app-deployer
+subjects:
+- kind: ServiceAccount
+  name: app-deployer
+  namespace: platform-prod
+

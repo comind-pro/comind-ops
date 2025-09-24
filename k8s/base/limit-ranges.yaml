@@ -1,0 +1,131 @@
+---
+# LimitRange for platform-dev
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: platform-dev-limits
+  namespace: platform-dev
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - max:
+      cpu: "2"
+      memory: "4Gi"
+    min:
+      cpu: "10m"
+      memory: "32Mi"
+    type: Container
+  - max:
+      storage: "50Gi"
+    min:
+      storage: "1Gi"
+    type: PersistentVolumeClaim
+---
+# LimitRange for platform-stage
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: platform-stage-limits
+  namespace: platform-stage
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - max:
+      cpu: "1"
+      memory: "2Gi"
+    min:
+      cpu: "10m"
+      memory: "32Mi"
+    type: Container
+  - max:
+      storage: "20Gi"
+    min:
+      storage: "1Gi"
+    type: PersistentVolumeClaim
+---
+# LimitRange for platform-prod
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: platform-prod-limits
+  namespace: platform-prod
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "1Gi"
+    defaultRequest:
+      cpu: "200m"
+      memory: "256Mi"
+    type: Container
+  - max:
+      cpu: "4"
+      memory: "8Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    type: Container
+  - max:
+      storage: "100Gi"
+    min:
+      storage: "1Gi"
+    type: PersistentVolumeClaim
+---
+# LimitRange for monitoring
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: monitoring-limits
+  namespace: monitoring
+spec:
+  limits:
+  - default:
+      cpu: "1"
+      memory: "1Gi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - max:
+      cpu: "2"
+      memory: "4Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    type: Container
+---
+# LimitRange for backup system
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: backup-system-limits
+  namespace: backup-system
+spec:
+  limits:
+  - default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    type: Container
+  - max:
+      cpu: "1"
+      memory: "2Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
+    type: Container
+

@@ -1,0 +1,77 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Platform Services for Development Environment
+namespace: platform-dev
+
+resources:
+  # ElasticMQ (SQS-compatible queue service)
+  - elasticmq/deployment.yaml
+  
+  # Docker Registry with retention
+  - registry/registry.yaml
+  - registry/registry-cleanup.yaml
+  
+  # Backup services
+  - backups/postgres-cronjob.yaml
+  - backups/minio-cronjob.yaml
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: comind-ops-platform
+  environment: development
+
+commonAnnotations:
+  comind-ops.io/version: "1.0.0"
+  comind-ops.io/platform-services: "true"
+
+# Configuration patches for development environment
+patches:
+  # ElasticMQ resource adjustments for dev
+  - target:
+      kind: Deployment
+      name: elasticmq
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "512Mi"
+
+  # Registry storage adjustment for dev
+  - target:
+      kind: PersistentVolumeClaim
+      name: registry-storage
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: "20Gi"
+
+# Images - pin versions for stability
+images:
+  - name: softwaremill/elasticmq
+    newTag: "1.5.7"
+  - name: registry
+    newTag: "2.8.3"
+  - name: regclient/regctl
+    newTag: "v0.5.7"
+  - name: postgres
+    newTag: "15-alpine"
+  - name: minio/mc
+    newTag: "latest"
+
+# Generate ConfigMaps and Secrets
+configMapGenerator:
+  - name: platform-config
+    literals:
+      - environment=development
+      - log_level=debug
+      - backup_retention=7
+      - cleanup_schedule="0 2 * * *"
+
+secretGenerator:
+  - name: platform-secrets
+    literals:
+      - default_password=changeme123
+    type: Opaque

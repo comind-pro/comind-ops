@@ -1,0 +1,77 @@
+---
+# Pod Security Standards for platform namespaces
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-dev
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    app.kubernetes.io/managed-by: "terraform"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-stage
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    app.kubernetes.io/managed-by: "terraform"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-prod
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    app.kubernetes.io/managed-by: "terraform"
+---
+# More relaxed security for system namespaces
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backup-system
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
+---
+# Security Context Constraints (example PodSecurityPolicy replacement)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: security-best-practices
+  namespace: platform-dev
+data:
+  guidelines: |
+    Pod Security Guidelines:
+    1. Run as non-root user (runAsUser: 1000+)
+    2. Don't allow privileged containers
+    3. Use read-only root filesystem when possible
+    4. Drop all capabilities, add only what's needed
+    5. Don't allow hostNetwork, hostPID, or hostIPC
+    6. Use securityContext.allowPrivilegeEscalation: false
+    
+    Example securityContext:
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      readOnlyRootFilesystem: true
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+

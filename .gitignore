@@ -1,0 +1,403 @@
+# ===========================================
+# Comind-Ops Cloud Setup - Complete .gitignore
+# ===========================================
+
+# ==================
+# TERRAFORM
+# ==================
+# Local .terraform directories
+**/.terraform/*
+**/.terraform.lock.hcl
+
+# .tfstate files (CRITICAL - never commit state!)
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+
+# .tfvars files (may contain sensitive data)
+*.tfvars
+*.tfvars.json
+*.auto.tfvars
+*.auto.tfvars.json
+
+# Terraform crash log files
+crash.log
+crash.*.log
+
+# Terraform plan files
+*.tfplan
+
+# Terraform state directory (local state storage)
+infra/terraform/states/
+**/states/
+.terraform-version
+
+# Override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# ===================
+# KUBERNETES
+# ===================
+# Kubeconfig files (may contain sensitive cluster info)
+kubeconfig
+kubeconfig.*
+.kubeconfig
+**/kubeconfig
+
+# Sealed secrets private keys
+*.key
+*.pem
+*.crt
+
+# Kubernetes secrets (plain text - before sealing)
+**/secrets/*.yaml
+**/secrets/*.yml
+!**/secrets/*.sealed.yaml
+!**/secrets/*.sealed.yml
+!**/secrets/README.md
+
+# Helm dependencies
+**/charts/*.tgz
+**/Chart.lock
+**/requirements.lock
+
+# ===================
+# DOCKER / CONTAINERS
+# ===================
+# Docker compose override files
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# Container logs
+*.log
+
+# ===================
+# SECRETS & CREDENTIALS
+# ===================
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# AWS credentials
+.aws/
+aws-credentials
+credentials.json
+
+# SSH keys
+id_rsa
+id_ed25519
+*.key
+*.pub
+
+# Certificate files
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# GPG keys
+*.gpg
+*.asc
+
+# Password files
+passwords.txt
+secrets.txt
+credentials.txt
+
+# ===================
+# IDE & EDITORS
+# ===================
+# VSCode
+.vscode/
+*.code-workspace
+.history/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*.tmp
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# ===================
+# OPERATING SYSTEMS
+# ===================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ===================
+# BUILD & PACKAGES
+# ===================
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+.npm
+.eslintcache
+.node_repl_history
+*.tgz
+.yarn-integrity
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Go
+vendor/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Rust
+target/
+Cargo.lock
+
+# Java
+*.class
+*.jar
+*.war
+*.ear
+*.logs
+hs_err_pid*
+
+# ===================
+# LOGS & TEMPORARY
+# ===================
+# Log files
+*.log
+logs/
+log/
+*.log.*
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+.temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Cache files
+.cache/
+cache/
+*.cache
+
+# ===================
+# LOCAL DEVELOPMENT
+# ===================
+# Local configuration overrides
+local.yaml
+local.yml
+*.local.yaml
+*.local.yml
+dev.override.*
+
+# Test outputs
+test-output/
+test-results/
+coverage/
+
+# Local scripts
+local-*.sh
+dev-*.sh
+test-*.sh
+
+# ===================
+# CI/CD
+# ===================
+# GitHub Actions logs
+.github/workflows/*.log
+
+# Jenkins
+.jenkins/
+
+# GitLab CI
+.gitlab-ci-local/
+
+# ===================
+# MONITORING & OBSERVABILITY
+# ===================
+# Prometheus data
+prometheus-data/
+grafana-data/
+
+# Jaeger
+jaeger-data/
+
+# ===================
+# DATABASES
+# ===================
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Database dumps
+*.sql
+*.dump
+
+# ===================
+# ARGOCD SPECIFIC
+# ===================
+# ArgoCD local configs
+.argocd/
+argocd-local-config.yaml
+
+# ===================
+# K3D SPECIFIC
+# ===================
+# k3d registries config
+registries.yaml
+
+# ===================
+# MISC
+# ===================
+# Compressed files
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Generated documentation
+docs/generated/
+site/
+
+# Lock files (depending on your preference)
+# Uncomment if you don't want to track lock files
+# package-lock.json
+# yarn.lock
+# composer.lock
+
+# Backup files
+*.orig
+*.rej
+
+# Editor backups
+*~
+.#*
+\#*#
+
+# ===================
+# PROJECT SPECIFIC
+# ===================
+# Local state directory (for any local state files)
+.local/
+local/
+
+# Temporary manifest files
+*.tmp.yaml
+*.tmp.yml
+
+# Debug outputs
+debug/
+debug.log
+
+# Local registry data
+registry-data/
+
+# Local volumes
+volumes/
+
+# ===================
+# SECURITY SCANNING
+# ===================
+# Security scan results
+.trivy/
+security-scan-results/
+vulnerability-reports/
+
+# ===================
+# END OF GITIGNORE
+# ===================

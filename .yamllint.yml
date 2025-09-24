@@ -1,0 +1,54 @@
+# YAML Lint Configuration for comind-ops Platform
+# Used by 'make lint' command
+
+extends: default
+
+rules:
+  # Line length - accommodate long Kubernetes resource names
+  line-length:
+    max: 120
+    level: warning
+
+  # Comments - allow comments without space after #
+  comments:
+    min-spaces-from-content: 1
+
+  # Document start - don't require --- at beginning
+  document-start:
+    present: false
+
+  # Indentation - standard 2 spaces
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Empty lines
+  empty-lines:
+    max: 2
+    max-start: 1
+    max-end: 1
+
+  # Truthy values - allow yes/no, on/off
+  truthy:
+    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+
+  # Key duplicates
+  key-duplicates: enable
+
+  # Brackets and braces
+  brackets:
+    max-spaces-inside: 1
+    max-spaces-inside-empty: 0
+
+  braces:
+    max-spaces-inside: 1
+    max-spaces-inside-empty: 0
+
+# Ignore certain files and directories
+ignore: |
+  .git/
+  .terraform/
+  node_modules/
+  *.sealed.yaml
+  **/secrets/*.yaml

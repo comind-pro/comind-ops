@@ -1,0 +1,177 @@
+#!/bin/bash
+set -euo pipefail
+
+# Comind-Ops Platform - Terraform Management Script
+# Usage: ./scripts/tf.sh <environment> [app-name] [command] [options]
+
+ENVIRONMENT="${1:-}"
+APP_NAME="${2:-core}"
+COMMAND="${3:-plan}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+print_usage() {
+    cat << EOF
+Usage: $0 <environment> [app-name] [command] [options]
+
+Arguments:
+    environment     Target environment (dev, stage, prod)
+    app-name        Application name or 'core' for infrastructure (default: core)
+    command         Terraform command (plan, apply, destroy, output, etc.) (default: plan)
+
+Options:
+    --help          Show this help message
+    --auto-approve  Auto-approve terraform apply/destroy
+    --var-file FILE Use specific tfvars file
+    --target RES    Target specific resource
+    --workspace WS  Use specific terraform workspace
+
+Examples:
+    $0 dev core plan                    # Plan core infrastructure for dev
+    $0 dev core apply                   # Apply core infrastructure for dev  
+    $0 dev my-app plan                  # Plan app-specific resources
+    $0 dev my-app apply --auto-approve  # Apply with auto-approval
+    $0 prod my-app destroy              # Destroy app resources in prod
+
+Terraform Directories:
+    Core: infra/terraform/core/
+    Apps: k8s/apps/<app-name>/terraform/
+    Envs: infra/terraform/envs/<env>/platform/
+EOF
+}
+
+log() { echo -e "${BLUE}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
+warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+
+# Default values
+AUTO_APPROVE=false
+VAR_FILE=""
+TARGET=""
+WORKSPACE=""
+
+# Parse command line arguments
+shift 3 # Remove positional arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --help) print_usage; exit 0 ;;
+        --auto-approve) AUTO_APPROVE=true; shift ;;
+        --var-file) VAR_FILE="$2"; shift 2 ;;
+        --target) TARGET="$2"; shift 2 ;;
+        --workspace) WORKSPACE="$2"; shift 2 ;;
+        *) error "Unknown option: $1"; print_usage; exit 1 ;;
+    esac
+done
+
+# Validation
+if [[ -z "$ENVIRONMENT" ]]; then
+    error "Environment is required"
+    print_usage
+    exit 1
+fi
+
+if [[ ! "$ENVIRONMENT" =~ ^(dev|stage|prod)$ ]]; then
+    error "Environment must be one of: dev, stage, prod"
+    exit 1
+fi
+
+# Determine Terraform directory
+if [[ "$APP_NAME" == "core" ]]; then
+    TF_DIR="$PROJECT_ROOT/infra/terraform/core"
+elif [[ -d "$PROJECT_ROOT/infra/terraform/envs/$ENVIRONMENT/$APP_NAME" ]]; then
+    TF_DIR="$PROJECT_ROOT/infra/terraform/envs/$ENVIRONMENT/$APP_NAME"
+elif [[ -d "$PROJECT_ROOT/k8s/apps/$APP_NAME/terraform" ]]; then
+    TF_DIR="$PROJECT_ROOT/k8s/apps/$APP_NAME/terraform"
+else
+    error "Terraform directory not found for app: $APP_NAME"
+    exit 1
+fi
+
+# Check dependencies
+if ! command -v terraform &> /dev/null; then
+    error "terraform is not installed or not in PATH"
+    exit 1
+fi
+
+log "Running Terraform $COMMAND for $APP_NAME in $ENVIRONMENT"
+log "Directory: $TF_DIR"
+
+# Change to terraform directory and run
+cd "$TF_DIR"
+
+# Set environment variables
+export TF_VAR_environment="$ENVIRONMENT"
+export TF_VAR_app_name="$APP_NAME"
+
+# Set workspace
+if [[ -z "$WORKSPACE" ]]; then
+    WORKSPACE="$ENVIRONMENT"
+fi
+
+# Initialize if needed
+if [[ ! -d ".terraform" ]]; then
+    log "Initializing Terraform..."
+    terraform init
+fi
+
+# Build terraform args
+TF_ARGS=()
+if [[ -n "$VAR_FILE" ]]; then
+    TF_ARGS+=("-var-file=$VAR_FILE")
+fi
+if [[ -n "$TARGET" ]]; then
+    TF_ARGS+=("-target=$TARGET")
+fi
+if [[ "$AUTO_APPROVE" == "true" && ("$COMMAND" == "apply" || "$COMMAND" == "destroy") ]]; then
+    TF_ARGS+=("-auto-approve")
+fi
+
+# Select workspace
+if terraform workspace list | grep -q "$WORKSPACE"; then
+    terraform workspace select "$WORKSPACE"
+else
+    terraform workspace new "$WORKSPACE"
+fi
+
+# Execute terraform command
+case "$COMMAND" in
+    "apply")
+        if [[ "$AUTO_APPROVE" != "true" ]]; then
+            warning "This will apply changes to $ENVIRONMENT environment"
+            read -p "Continue? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                log "Aborted by user"
+                exit 0
+            fi
+        fi
+        terraform apply "${TF_ARGS[@]}"
+        success "✅ Terraform apply completed!"
+        ;;
+    "destroy")
+        warning "This will DESTROY resources in $ENVIRONMENT environment!"
+        if [[ "$AUTO_APPROVE" != "true" ]]; then
+            read -p "Type 'destroy' to confirm: " -r
+            if [[ "$REPLY" != "destroy" ]]; then
+                log "Aborted by user"
+                exit 0
+            fi
+        fi
+        terraform destroy "${TF_ARGS[@]}"
+        success "✅ Terraform destroy completed!"
+        ;;
+    *)
+        terraform "$COMMAND" "${TF_ARGS[@]}"
+        ;;
+esac
+
+success "Terraform operation completed! 🚀"

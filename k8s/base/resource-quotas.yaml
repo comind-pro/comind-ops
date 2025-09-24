@@ -1,0 +1,87 @@
+---
+# Resource Quota for platform-dev
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: platform-dev-quota
+  namespace: platform-dev
+spec:
+  hard:
+    requests.cpu: "4"
+    requests.memory: 8Gi
+    limits.cpu: "8"
+    limits.memory: 16Gi
+    persistentvolumeclaims: "20"
+    pods: "50"
+    services: "20"
+    secrets: "50"
+    configmaps: "50"
+---
+# Resource Quota for platform-stage
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: platform-stage-quota
+  namespace: platform-stage
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    persistentvolumeclaims: "10"
+    pods: "25"
+    services: "10"
+    secrets: "25"
+    configmaps: "25"
+---
+# Resource Quota for platform-prod
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: platform-prod-quota
+  namespace: platform-prod
+spec:
+  hard:
+    requests.cpu: "6"
+    requests.memory: 12Gi
+    limits.cpu: "12"
+    limits.memory: 24Gi
+    persistentvolumeclaims: "30"
+    pods: "100"
+    services: "30"
+    secrets: "100"
+    configmaps: "100"
+---
+# Resource Quota for monitoring
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: monitoring-quota
+  namespace: monitoring
+spec:
+  hard:
+    requests.cpu: "2"
+    requests.memory: 4Gi
+    limits.cpu: "4"
+    limits.memory: 8Gi
+    persistentvolumeclaims: "10"
+    pods: "20"
+    services: "10"
+---
+# Resource Quota for backup system
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: backup-system-quota
+  namespace: backup-system
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 2Gi
+    limits.cpu: "2"
+    limits.memory: 4Gi
+    persistentvolumeclaims: "5"
+    pods: "10"
+    services: "5"
+

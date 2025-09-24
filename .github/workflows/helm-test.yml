@@ -1,0 +1,386 @@
+name: "Helm - Chart Testing & Validation"
+
+on:
+  push:
+    paths:
+      - 'k8s/apps/**/chart/**'
+      - 'k8s/apps/**/values/**'
+      - '.github/workflows/helm-test.yml'
+  pull_request:
+    paths:
+      - 'k8s/apps/**/chart/**'
+      - 'k8s/apps/**/values/**'
+
+env:
+  HELM_VERSION: 3.12.3
+  CHART_TESTING_VERSION: 3.9.0
+  KUBERNETES_VERSION: 1.28.0
+
+jobs:
+  # ===========================================
+  # DETECT CHANGED CHARTS
+  # ===========================================
+  
+  changes:
+    name: "🔍 Detect Chart Changes"
+    runs-on: ubuntu-latest
+    outputs:
+      charts: ${{ steps.list-changed.outputs.charts }}
+    steps:
+      - name: "📥 Checkout Code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "🔧 Setup Chart Testing"
+        uses: helm/chart-testing-action@v2.6.1
+        with:
+          version: ${{ env.CHART_TESTING_VERSION }}
+
+      - name: "📋 List Changed Charts"
+        id: list-changed
+        run: |
+          changed=$(ct list-changed --target-branch ${{ github.event.repository.default_branch }} --chart-dirs k8s/apps)
+          if [[ -n "$changed" ]]; then
+            echo "charts=true" >> $GITHUB_OUTPUT
+            echo "Changed charts:"
+            echo "$changed"
+          else
+            echo "charts=false" >> $GITHUB_OUTPUT
+            echo "No charts changed"
+          fi
+
+  # ===========================================
+  # HELM LINT & VALIDATION
+  # ===========================================
+  
+  lint:
+    name: "🧹 Helm Lint & Validation"
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.charts == 'true'
+    steps:
+      - name: "📥 Checkout Code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "⚙️ Setup Helm"
+        uses: azure/setup-helm@v3
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: "🔧 Setup Chart Testing"
+        uses: helm/chart-testing-action@v2.6.1
+        with:
+          version: ${{ env.CHART_TESTING_VERSION }}
+
+      - name: "🧹 Lint Charts"
+        run: |
+          echo "🧹 Linting Helm charts..."
+          ct lint --target-branch ${{ github.event.repository.default_branch }} \
+                  --chart-dirs k8s/apps \
+                  --validate-maintainers=false
+
+      - name: "📊 Validate Chart Structure"
+        run: |
+          echo "📊 Validating chart structure and best practices..."
+          
+          find k8s/apps -name "Chart.yaml" | while read -r chart_file; do
+            chart_dir=$(dirname "$chart_file")
+            chart_name=$(basename "$chart_dir")
+            
+            echo "Validating $chart_name structure..."
+            
+            # Check required files exist
+            required_files=("templates/" "values.yaml")
+            for file in "${required_files[@]}"; do
+              if [[ ! -e "$chart_dir/$file" ]]; then
+                echo "❌ Missing required file: $chart_dir/$file"
+                exit 1
+              fi
+            done
+            
+            # Check Chart.yaml has required fields
+            if ! grep -q "apiVersion: v2" "$chart_file"; then
+              echo "❌ Chart.yaml missing apiVersion: v2"
+              exit 1
+            fi
+            
+            echo "✅ $chart_name structure is valid"
+          done
+
+      - name: "🔍 Template Validation"
+        run: |
+          echo "🔍 Validating Helm templates..."
+          
+          find k8s/apps -name "Chart.yaml" | while read -r chart_file; do
+            chart_dir=$(dirname "$chart_file")
+            chart_name=$(basename "$chart_dir")
+            app_name=$(basename "$(dirname "$chart_dir")")
+            
+            echo "Testing templates for $app_name..."
+            
+            # Test with different values files
+            for env in dev stage prod; do
+              values_file="k8s/apps/$app_name/values/$env.yaml"
+              if [[ -f "$values_file" ]]; then
+                echo "  Testing $env environment..."
+                helm template "$chart_name" "$chart_dir" \
+                  --values "$values_file" \
+                  --dry-run > /tmp/"${chart_name}-${env}".yaml
+                echo "  ✅ $env template generated successfully"
+              fi
+            done
+          done
+
+  # ===========================================
+  # CHART TESTING WITH REAL CLUSTER
+  # ===========================================
+  
+  install:
+    name: "🚀 Chart Installation Test"
+    runs-on: ubuntu-latest
+    needs: [changes, lint]
+    if: needs.changes.outputs.charts == 'true'
+    strategy:
+      matrix:
+        k8s-version: ["1.27.3", "1.28.0"]
+    steps:
+      - name: "📥 Checkout Code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: "☸️ Setup Kubernetes"
+        uses: helm/kind-action@v1.8.0
+        with:
+          version: v0.20.0
+          node_image: kindest/node:v${{ matrix.k8s-version }}
+          kubectl_version: v${{ matrix.k8s-version }}
+          cluster_name: chart-testing
+
+      - name: "⚙️ Setup Helm"
+        uses: azure/setup-helm@v3
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: "🔧 Setup Chart Testing"
+        uses: helm/chart-testing-action@v2.6.1
+        with:
+          version: ${{ env.CHART_TESTING_VERSION }}
+
+      - name: "🏗️ Setup Test Environment"
+        run: |
+          echo "🏗️ Setting up test environment..."
+          
+          # Create test namespaces
+          kubectl create namespace sample-app-dev || true
+          kubectl create namespace sample-app-stage || true
+          kubectl create namespace sample-app-prod || true
+          
+          # Install required CRDs and operators for testing
+          # (In a real scenario, you might need ServiceMonitor CRDs, etc.)
+          
+          echo "✅ Test environment ready"
+
+      - name: "🧪 Run Chart Tests"
+        run: |
+          echo "🧪 Running chart installation tests..."
+          ct install --target-branch ${{ github.event.repository.default_branch }} \
+                     --chart-dirs k8s/apps \
+                     --helm-extra-set-args "--set=image.tag=latest"
+
+      - name: "🔍 Post-Install Validation"
+        run: |
+          echo "🔍 Running post-installation validation..."
+          
+          # Check that all resources were created successfully
+          kubectl get all -A
+          
+          # Check pod status
+          kubectl get pods -A | grep -v kube-system | grep -v local-path-storage || true
+          
+          # Wait for deployments to be ready
+          for ns in sample-app-dev sample-app-stage sample-app-prod; do
+            if kubectl get deployment -n "$ns" 2>/dev/null | grep -q .; then
+              echo "Waiting for deployments in $ns to be ready..."
+              kubectl wait --for=condition=available --timeout=300s deployment --all -n "$ns" || true
+            fi
+          done
+
+  # ===========================================
+  # SECURITY & POLICY VALIDATION
+  # ===========================================
+  
+  security:
+    name: "🔒 Chart Security Validation"
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.charts == 'true'
+    steps:
+      - name: "📥 Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "⚙️ Setup Helm"
+        uses: azure/setup-helm@v3
+        with:
+          version: ${{ env.HELM_VERSION }}
+
+      - name: "🔒 Security Policy Check with Polaris"
+        run: |
+          echo "🔒 Running security policy validation..."
+          
+          # Install Polaris
+          curl -L https://github.com/FairwindsOps/polaris/releases/latest/download/polaris_linux_amd64.tar.gz | tar xz
+          chmod +x polaris
+          
+          # Generate manifests and validate
+          find k8s/apps -name "Chart.yaml" | while read -r chart_file; do
+            chart_dir=$(dirname "$chart_file")
+            chart_name=$(basename "$chart_dir")
+            app_name=$(basename "$(dirname "$chart_dir")")
+            
+            echo "Security scanning $app_name..."
+            
+            # Generate manifests for each environment
+            for env in dev stage prod; do
+              values_file="k8s/apps/$app_name/values/$env.yaml"
+              if [[ -f "$values_file" ]]; then
+                helm template "$chart_name" "$chart_dir" \
+                  --values "$values_file" > "/tmp/${app_name}-${env}.yaml"
+                  
+                # Run Polaris validation
+                ./polaris validate --audit-path "/tmp/${app_name}-${env}.yaml" || echo "⚠️ Security issues found in $app_name-$env"
+              fi
+            done
+          done
+
+      - name: "🛡️ Resource Security Check"
+        run: |
+          echo "🛡️ Checking for security anti-patterns..."
+          
+          find k8s/apps -name "*.yaml" -exec grep -l "privileged.*true\|runAsUser.*0\|hostNetwork.*true\|hostPID.*true" {} \; | while read -r file; do
+            echo "⚠️ Security concern found in: $file"
+            grep -n "privileged.*true\|runAsUser.*0\|hostNetwork.*true\|hostPID.*true" "$file" || true
+          done || echo "✅ No obvious security anti-patterns found"
+
+  # ===========================================
+  # DOCUMENTATION VALIDATION
+  # ===========================================
+  
+  docs:
+    name: "📚 Chart Documentation"
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.charts == 'true'
+    steps:
+      - name: "📥 Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "📚 Validate Chart Documentation"
+        run: |
+          echo "📚 Validating chart documentation..."
+          
+          find k8s/apps -name "Chart.yaml" | while read -r chart_file; do
+            chart_dir=$(dirname "$chart_file")
+            app_name=$(basename "$(dirname "$chart_dir")")
+            
+            echo "Checking documentation for $app_name..."
+            
+            # Check for README
+            if [[ ! -f "k8s/apps/$app_name/README.md" ]]; then
+              echo "⚠️ Missing README.md for $app_name"
+            else
+              echo "✅ README.md exists for $app_name"
+            fi
+            
+            # Check Chart.yaml has description
+            if ! grep -q "description:" "$chart_file"; then
+              echo "⚠️ Missing description in Chart.yaml for $app_name"
+            else
+              echo "✅ Description exists in Chart.yaml for $app_name"
+            fi
+            
+            # Check for values documentation
+            values_file="$chart_dir/values.yaml"
+            if [[ -f "$values_file" ]]; then
+              if grep -q "^#" "$values_file"; then
+                echo "✅ Values file has comments for $app_name"
+              else
+                echo "⚠️ Values file lacks documentation comments for $app_name"
+              fi
+            fi
+          done
+
+      - name: "📋 Generate Chart Inventory"
+        run: |
+          echo "📋 Generating chart inventory..."
+          
+          echo "# Helm Charts Inventory" > chart-inventory.md
+          echo "Generated on: $(date)" >> chart-inventory.md
+          echo "" >> chart-inventory.md
+          
+          find k8s/apps -name "Chart.yaml" | while read -r chart_file; do
+            chart_dir=$(dirname "$chart_file")
+            app_name=$(basename "$(dirname "$chart_dir")")
+            
+            echo "## $app_name" >> chart-inventory.md
+            
+            # Extract chart info
+            version=$(grep "^version:" "$chart_file" | awk '{print $2}')
+            app_version=$(grep "^appVersion:" "$chart_file" | awk '{print $2}')
+            description=$(grep "^description:" "$chart_file" | sed 's/description: *//')
+            
+            echo "- **Version**: $version" >> chart-inventory.md
+            echo "- **App Version**: $app_version" >> chart-inventory.md
+            echo "- **Description**: $description" >> chart-inventory.md
+            
+            # Count templates
+            template_count=$(find "$chart_dir/templates" -name "*.yaml" -o -name "*.tpl" | wc -l)
+            echo "- **Templates**: $template_count files" >> chart-inventory.md
+            
+            # List environments
+            env_files=$(find "k8s/apps/$app_name/values" -name "*.yaml" 2>/dev/null | wc -l)
+            echo "- **Environments**: $env_files configurations" >> chart-inventory.md
+            echo "" >> chart-inventory.md
+          done
+          
+          echo "Chart inventory generated:"
+          cat chart-inventory.md
+
+  # ===========================================
+  # TEST SUMMARY
+  # ===========================================
+  
+  summary:
+    name: "📊 Test Summary"
+    runs-on: ubuntu-latest
+    needs: [changes, lint, install, security, docs]
+    if: always()
+    steps:
+      - name: "📊 Helm Test Results"
+        run: |
+          echo "📊 Helm Chart Testing Summary"
+          echo "============================"
+          echo "Changes Detected: ${{ needs.changes.outputs.charts }}"
+          echo "Lint Results: ${{ needs.lint.result }}"
+          echo "Install Tests: ${{ needs.install.result }}"
+          echo "Security Scan: ${{ needs.security.result }}"
+          echo "Documentation: ${{ needs.docs.result }}"
+          echo ""
+          
+          if [[ "${{ needs.changes.outputs.charts }}" == "true" ]]; then
+            if [[ "${{ needs.lint.result }}" == "success" && \
+                  "${{ needs.install.result }}" == "success" && \
+                  "${{ needs.security.result }}" == "success" && \
+                  "${{ needs.docs.result }}" == "success" ]]; then
+              echo "🎉 All Helm chart tests passed!"
+              exit 0
+            else
+              echo "❌ Some Helm chart tests failed"
+              exit 1
+            fi
+          else
+            echo "ℹ️ No chart changes detected - skipping tests"
+          fi

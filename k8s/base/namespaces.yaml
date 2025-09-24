@@ -1,0 +1,26 @@
+---
+# Additional namespaces for applications (platform namespaces are created by Terraform)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+    app.kubernetes.io/managed-by: "kubernetes"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    name: ingress-nginx
+    app.kubernetes.io/managed-by: "kubernetes"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: backup-system
+  labels:
+    name: backup-system
+    app.kubernetes.io/managed-by: "kubernetes"
+

@@ -1,0 +1,213 @@
+# Production environment configuration
+# High-availability, secure, and optimized for performance
+
+# Global configuration
+global:
+  environment: prod
+  domain: example.com
+  namespace: sample-app-prod
+
+# Application scaling (production)
+replicaCount: 3
+
+# Container image configuration
+image:
+  repository: sample-app
+  pullPolicy: IfNotPresent
+  tag: "1.0.0"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Ingress configuration  
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/rate-limit: "5000"
+    nginx.ingress.kubernetes.io/enable-cors: "false"
+    nginx.ingress.kubernetes.io/server-snippet: |
+      add_header X-Content-Type-Options nosniff;
+      add_header X-Frame-Options DENY;
+      add_header X-XSS-Protection "1; mode=block";
+      add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
+    cert-manager.io/cluster-issuer: "letsencrypt-production"
+  hosts:
+    - host: api.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+        - path: /api
+          pathType: Prefix
+  tls:
+    - secretName: sample-app-prod-tls
+      hosts:
+        - api.example.com
+
+# Resources (production-optimized)
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Autoscaling enabled with conservative settings
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 70
+
+# Persistence with high-performance storage
+persistence:
+  enabled: true
+  size: 50Gi
+  storageClass: "gp3"
+  annotations:
+    volume.beta.kubernetes.io/storage-provisioner: "ebs.csi.aws.com"
+
+# Environment variables
+env:
+  NODE_ENV: production
+  PORT: "8080"
+  LOG_LEVEL: warn
+  APP_NAME: sample-app
+  APP_VERSION: "1.0.0"
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "true"
+  ENABLE_DEBUG: "false"
+
+# Platform service integrations (production endpoints)
+platformServices:
+  database:
+    enabled: true
+    host: postgres-prod.rds.amazonaws.com
+    port: 5432
+    name: sampleapp_prod
+    pool:
+      min: 10
+      max: 50
+  
+  queue:
+    enabled: true
+    host: sqs.us-east-1.amazonaws.com
+    port: 443
+    region: us-east-1
+    queues:
+      - sample-app-prod-default
+      - sample-app-prod-notifications
+      - sample-app-prod-high-priority
+      - sample-app-prod-dlq
+  
+  storage:
+    enabled: true
+    endpoint: s3.amazonaws.com
+    secure: true
+    buckets:
+      - sample-app-prod-uploads
+      - sample-app-prod-backups
+      - sample-app-prod-logs
+
+  cache:
+    enabled: true
+    host: redis-prod.cache.amazonaws.com
+    port: 6379
+    database: 0
+
+# Monitoring configuration (comprehensive)
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 10s
+    scrapeTimeout: 5s
+    labels:
+      environment: production
+      team: platform
+
+# Network policy (maximum security)
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 8080
+  egress:
+    # Database access
+    - to:
+      - namespaceSelector: {}
+        podSelector:
+          matchLabels:
+            app: postgres-proxy
+      ports:
+      - protocol: TCP
+        port: 5432
+    # External AWS services
+    - to: []
+      ports:
+      - protocol: TCP
+        port: 443  # HTTPS for AWS services
+    # DNS
+    - to: []
+      ports:
+      - protocol: UDP
+        port: 53
+
+# Pod Disruption Budget (conservative)
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Security context (maximum security)
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 3000
+  fsGroup: 2000
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+    - ALL
+
+# Affinity and anti-affinity for high availability
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - sample-app
+        topologyKey: kubernetes.io/hostname
+
+# Jobs configuration (production deployments)
+jobs:
+  - name: pre-deploy-check
+    enabled: true
+    image: sample-app:1.0.0
+    command: ['sh', '-c']
+    args: ['echo "Pre-deployment checks"; exit 0']
+    restartPolicy: Never
+    backoffLimit: 1

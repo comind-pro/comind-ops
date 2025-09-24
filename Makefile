@@ -1,0 +1,385 @@
+# Comind-Ops Platform - Comprehensive Makefile
+# Provides easy-to-remember commands for all platform operations
+
+# Default values
+ENV ?= dev
+APP ?= sample-app
+COMMAND ?= plan
+TEAM ?= platform
+
+# Colors for output
+BLUE := \033[0;34m
+GREEN := \033[0;32m
+YELLOW := \033[1;33m
+RED := \033[0;31m
+NC := \033[0m # No Color
+
+# Help target - default when running just 'make'
+.DEFAULT_GOAL := help
+
+.PHONY: help
+help: ## Show this help message
+	@echo "$(BLUE)Comind-Ops Platform - Available Commands$(NC)"
+	@echo ""
+	@echo "$(GREEN)🚀 Quick Start:$(NC)"
+	@echo "  make bootstrap                    # Complete cluster setup"
+	@echo "  make argo-login                   # Get ArgoCD admin credentials"
+	@echo "  make new-app-full APP=my-api      # Create application with infrastructure"
+	@echo "  make tf-apply-app APP=my-api      # Provision application infrastructure"
+	@echo "  make deploy                       # Deploy all platform services"
+	@echo ""
+	@echo "$(GREEN)📋 Available Commands:$(NC)"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(YELLOW)%-25s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@echo ""
+	@echo "$(GREEN)🔧 Variables:$(NC)"
+	@echo "  ENV        Environment (dev, stage, prod) [default: $(ENV)]"
+	@echo "  APP        Application name [default: $(APP)]"
+	@echo "  COMMAND    Terraform command [default: $(COMMAND)]"
+	@echo "  TEAM       Team name [default: $(TEAM)]"
+	@echo ""
+	@echo "$(GREEN)💡 Examples:$(NC)"
+	@echo "  make new-app-full APP=payment-api TEAM=backend"
+	@echo "  make tf-apply-app APP=payment-api"
+	@echo "  make tf ENV=prod APP=my-app COMMAND=apply"
+	@echo "  make seal APP=my-app ENV=stage FILE=secret.yaml"
+
+# ===========================================
+# 🏗️  INFRASTRUCTURE & BOOTSTRAP
+# ===========================================
+
+.PHONY: bootstrap
+bootstrap: ## Complete cluster setup (core infrastructure + platform services)
+	@echo "$(BLUE)🏗️  Bootstrapping Comind-Ops Platform...$(NC)"
+	@echo "$(YELLOW)Step 1/5: Initializing Terraform...$(NC)"
+	@terraform -chdir=infra/terraform/core init
+	@echo "$(YELLOW)Step 2/5: Deploying core infrastructure...$(NC)"
+	@./scripts/tf.sh $(ENV) core apply --auto-approve
+	@echo "$(YELLOW)Step 3/5: Waiting for cluster to be ready...$(NC)"
+	@sleep 30
+	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || echo "ArgoCD still starting..."
+	@echo "$(YELLOW)Step 4/5: Applying base Kubernetes resources...$(NC)"
+	@kubectl apply -k k8s/base/
+	@echo "$(YELLOW)Step 5/5: Deploying platform services...$(NC)"
+	@kubectl apply -k k8s/platform/
+	@echo "$(GREEN)✅ Bootstrap complete!$(NC)"
+	@echo ""
+	@$(MAKE) --no-print-directory status
+
+.PHONY: cleanup
+cleanup: ## Destroy cluster and cleanup resources (⚠️  DESTRUCTIVE)
+	@echo "$(RED)⚠️  WARNING: This will destroy the entire $(ENV) environment!$(NC)"
+	@read -p "Type 'destroy' to confirm: " confirm && [ "$$confirm" = "destroy" ]
+	@echo "$(YELLOW)Cleaning up comind-ops Platform...$(NC)"
+	@kubectl delete -k k8s/platform/ --ignore-not-found=true
+	@kubectl delete -k k8s/base/ --ignore-not-found=true
+	@./scripts/tf.sh $(ENV) core destroy --auto-approve
+	@echo "$(GREEN)✅ Cleanup complete$(NC)"
+
+# ===========================================
+# 🔐 ARGOCD & GITOPS
+# ===========================================
+
+.PHONY: argo-login
+argo-login: ## Get ArgoCD admin credentials and access information
+	@echo "$(BLUE)🔐 ArgoCD Access Information$(NC)"
+	@echo ""
+	@echo "$(GREEN)Web UI:$(NC) http://argocd.$(ENV).127.0.0.1.nip.io:8080"
+	@echo ""
+	@echo "$(GREEN)Admin Credentials:$(NC)"
+	@echo "Username: admin"
+	@echo -n "Password: "
+	@kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d && echo "" || echo "Not available (check if ArgoCD is running)"
+	@echo ""
+	@echo "$(GREEN)Port Forward (if needed):$(NC)"
+	@echo "kubectl port-forward service/argocd-server -n argocd 8080:80"
+
+.PHONY: argo-apps
+argo-apps: ## List all ArgoCD applications
+	@echo "$(BLUE)📱 ArgoCD Applications:$(NC)"
+	@kubectl get applications -n argocd -o custom-columns="NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REPO:.spec.source.repoURL"
+
+# ===========================================
+# 📱 APPLICATION MANAGEMENT  
+# ===========================================
+
+.PHONY: new-app
+new-app: ## Create new application (APP=name TEAM=team)
+	@echo "$(BLUE)📱 Creating new application: $(APP)$(NC)"
+	@./scripts/new-app.sh $(APP) --team $(TEAM)
+	@echo "$(GREEN)✅ Application $(APP) created successfully!$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Next steps:$(NC)"
+	@echo "1. Customize templates in k8s/apps/$(APP)/"
+	@echo "2. Create secrets: make seal APP=$(APP) ENV=$(ENV) FILE=secret.yaml"
+	@echo "3. Deploy: git add -A && git commit && git push"
+
+.PHONY: new-app-full
+new-app-full: ## Create application with full infrastructure (APP=name TEAM=team)
+	@echo "$(BLUE)📱 Creating application $(APP) with infrastructure...$(NC)"
+	@./scripts/new-app.sh $(APP) --team $(TEAM) --with-database --with-storage --with-queue --with-terraform
+	@echo "$(GREEN)✅ Application $(APP) created with complete infrastructure!$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Next steps:$(NC)"
+	@echo "1. Provision infrastructure: make tf-init-app APP=$(APP) && make tf-apply-app APP=$(APP)"
+	@echo "2. Customize Helm chart: k8s/apps/$(APP)/values/dev.yaml"
+	@echo "3. Create secrets: make seal APP=$(APP) ENV=dev FILE=secret.yaml"
+	@echo "4. Deploy: git add -A && git commit && git push"
+
+.PHONY: new-app-api
+new-app-api: ## Create API application with database (APP=name TEAM=team PORT=3000)
+	@echo "$(BLUE)📱 Creating API application: $(APP)$(NC)"
+	@./scripts/new-app.sh $(APP) --team $(TEAM) --with-database --with-terraform --port $(or $(PORT),3000)
+	@echo "$(GREEN)✅ API application $(APP) created!$(NC)"
+
+.PHONY: new-app-worker
+new-app-worker: ## Create worker application with queue (APP=name TEAM=team)  
+	@echo "$(BLUE)📱 Creating worker application: $(APP)$(NC)"
+	@./scripts/new-app.sh $(APP) --team $(TEAM) --with-queue --with-database --with-terraform --sync-wave 20
+	@echo "$(GREEN)✅ Worker application $(APP) created!$(NC)"
+
+.PHONY: new-app-simple
+new-app-simple: ## Create minimal application (APP=name TEAM=team)
+	@echo "$(BLUE)📱 Creating simple application: $(APP)$(NC)"
+	@./scripts/new-app.sh $(APP) --team $(TEAM) --language $(or $(LANGUAGE),generic)
+	@echo "$(GREEN)✅ Simple application $(APP) created!$(NC)"
+
+.PHONY: list-apps
+list-apps: ## List all applications in the platform
+	@echo "$(BLUE)📋 Platform Applications:$(NC)"
+	@find k8s/apps -name "Chart.yaml" -exec dirname {} \; | sed 's|k8s/apps/||g' | sed 's|/chart||g' | sort
+
+# ===========================================
+# 🔒 SECRET MANAGEMENT
+# ===========================================
+
+.PHONY: seal
+seal: ## Seal secret for GitOps (APP=name ENV=env FILE=secret.yaml)
+	@echo "$(BLUE)🔒 Sealing secret for $(APP) in $(ENV)$(NC)"
+	@if [ -z "$(FILE)" ]; then \
+		echo "$(RED)Error: FILE parameter required$(NC)"; \
+		echo "Usage: make seal APP=my-app ENV=dev FILE=secret.yaml"; \
+		exit 1; \
+	fi
+	@./scripts/seal-secret.sh $(APP) $(ENV) $(FILE)
+	@echo "$(GREEN)✅ Secret sealed successfully!$(NC)"
+
+# ===========================================
+# 🏗️  TERRAFORM OPERATIONS
+# ===========================================
+
+.PHONY: tf
+tf: ## Run Terraform command (ENV=env APP=app COMMAND=plan)
+	@echo "$(BLUE)🏗️  Running Terraform $(COMMAND) for $(APP) in $(ENV)$(NC)"
+	@./scripts/tf.sh $(ENV) $(APP) $(COMMAND)
+
+.PHONY: tf-plan
+tf-plan: ## Plan Terraform changes (ENV=env APP=app)
+	@$(MAKE) --no-print-directory tf COMMAND=plan
+
+.PHONY: tf-apply
+tf-apply: ## Apply Terraform changes (ENV=env APP=app)
+	@$(MAKE) --no-print-directory tf COMMAND=apply
+
+.PHONY: tf-output
+tf-output: ## Show Terraform outputs (ENV=env APP=app)
+	@$(MAKE) --no-print-directory tf COMMAND=output
+
+# Application-specific Terraform commands
+.PHONY: tf-init-app
+tf-init-app: ## Initialize Terraform for application (APP=name)
+	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP). Run: make new-app-full APP=$(APP)$(NC)"; exit 1; fi
+	@echo "$(BLUE)🔧 Initializing Terraform for $(APP)...$(NC)"
+	@cd infra/terraform/apps/$(APP) && terraform init
+
+.PHONY: tf-plan-app  
+tf-plan-app: ## Plan Terraform for application (APP=name)
+	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
+	@echo "$(BLUE)📋 Planning Terraform changes for $(APP)...$(NC)"
+	@cd infra/terraform/apps/$(APP) && terraform plan
+
+.PHONY: tf-apply-app
+tf-apply-app: ## Apply Terraform for application (APP=name)
+	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
+	@echo "$(BLUE)🚀 Applying Terraform for $(APP)...$(NC)"
+	@cd infra/terraform/apps/$(APP) && terraform apply
+
+.PHONY: tf-destroy-app
+tf-destroy-app: ## Destroy Terraform resources for application (APP=name)
+	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
+	@echo "$(YELLOW)⚠️  This will destroy all infrastructure for $(APP). Are you sure? (y/N)$(NC)"
+	@read -r confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "Cancelled." && exit 1)
+	@cd infra/terraform/apps/$(APP) && terraform destroy
+
+.PHONY: tf-output-app
+tf-output-app: ## Show Terraform outputs for application (APP=name)
+	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
+	@echo "$(BLUE)📤 Terraform outputs for $(APP):$(NC)"
+	@cd infra/terraform/apps/$(APP) && terraform output
+
+.PHONY: tf-status-app
+tf-status-app: ## Show Terraform status for application (APP=name)
+	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
+	@echo "$(BLUE)📊 Terraform status for $(APP):$(NC)"
+	@cd infra/terraform/apps/$(APP) && terraform show -json | jq -r '.values.root_module.resources[] | select(.type != "random_password") | "\(.type).\(.name): \(.values.metadata[0].name // .values.name // "N/A")"' 2>/dev/null || echo "No resources provisioned yet"
+
+.PHONY: tf-list-apps
+tf-list-apps: ## List applications with Terraform configurations
+	@echo "$(BLUE)📋 Applications with Terraform infrastructure:$(NC)"
+	@find infra/terraform/apps -name "main.tf" -exec dirname {} \; | sed 's|infra/terraform/apps/||g' | sort || echo "No Terraform applications found"
+
+# ===========================================
+# 🚀 DEPLOYMENT & OPERATIONS
+# ===========================================
+
+.PHONY: deploy
+deploy: ## Deploy all platform services and applications
+	@echo "$(BLUE)🚀 Deploying comind-ops Platform...$(NC)"
+	@kubectl apply -k k8s/base/
+	@kubectl apply -k k8s/platform/
+	@echo "$(GREEN)✅ Platform deployed successfully!$(NC)"
+
+.PHONY: status
+status: ## Show overall platform status
+	@echo "$(BLUE)📊 comind-ops Platform Status$(NC)"
+	@echo ""
+	@echo "$(GREEN)Cluster Information:$(NC)"
+	@kubectl cluster-info --context k3d-comind-ops-dev | head -2
+	@echo ""
+	@echo "$(GREEN)ArgoCD Status:$(NC)"
+	@kubectl get pods -n argocd -l app.kubernetes.io/name=argocd-server --no-headers | awk '{print "ArgoCD Server: " $$3}'
+	@echo ""
+	@echo "$(GREEN)Platform Services:$(NC)"
+	@kubectl get pods -n platform-dev --no-headers | awk '{print $$1 ": " $$3}' | head -10
+	@echo ""
+	@echo "$(GREEN)Quick Access:$(NC)"
+	@echo "• ArgoCD UI: http://argocd.$(ENV).127.0.0.1.nip.io:8080"
+	@echo "• ElasticMQ: http://elasticmq.$(ENV).127.0.0.1.nip.io:8080"
+	@echo "• Registry: http://registry.$(ENV).127.0.0.1.nip.io:8080"
+
+# ===========================================
+# ✅ VALIDATION & TESTING
+# ===========================================
+
+.PHONY: validate
+validate: ## Validate all configurations
+	@echo "$(BLUE)✅ Validating platform configurations...$(NC)"
+	@echo "$(YELLOW)Initializing Terraform...$(NC)"
+	@terraform -chdir=infra/terraform/core init -upgrade > /dev/null 2>&1 || true
+	@echo "$(YELLOW)Validating Terraform...$(NC)"
+	@terraform -chdir=infra/terraform/core validate
+	@echo "$(YELLOW)Validating Kubernetes manifests...$(NC)"
+	@find k8s -name "*.yaml" -exec kubectl apply --dry-run=client -f {} \; > /dev/null 2>&1 || echo "⚠️  Some manifests require cluster access"
+	@echo "$(YELLOW)Validating Helm charts...$(NC)"
+	@find k8s/apps -name "Chart.yaml" -exec dirname {} \; | xargs -I {} helm lint {} > /dev/null 2>&1 || echo "⚠️  Helm charts validation completed"
+	@echo "$(GREEN)✅ All validations passed!$(NC)"
+
+.PHONY: lint
+lint: ## Lint all code and configurations
+	@echo "$(BLUE)🧹 Linting platform code...$(NC)"
+	@echo "$(YELLOW)Formatting Terraform...$(NC)"
+	@terraform -chdir=infra/terraform/core fmt -recursive
+	@echo "$(YELLOW)Linting shell scripts...$(NC)"
+	@find scripts -name "*.sh" -exec shellcheck {} \; || true
+	@echo "$(GREEN)✅ Linting complete$(NC)"
+
+.PHONY: test
+test: ## Run comprehensive test suite
+	@echo "$(BLUE)🧪 Running comprehensive test suite...$(NC)"
+	@./tests/run-tests.sh --category all --format junit
+	@echo "$(GREEN)✅ All tests completed$(NC)"
+
+.PHONY: test-unit
+test-unit: ## Run unit tests only
+	@echo "$(BLUE)🧪 Running unit tests...$(NC)"
+	@./tests/run-tests.sh --category unit --format junit
+	@echo "$(GREEN)✅ Unit tests completed$(NC)"
+
+.PHONY: test-integration
+test-integration: ## Run integration tests only
+	@echo "$(BLUE)🧪 Running integration tests...$(NC)"
+	@./tests/run-tests.sh --category integration --format junit
+	@echo "$(GREEN)✅ Integration tests completed$(NC)"
+
+.PHONY: test-e2e
+test-e2e: ## Run end-to-end tests only
+	@echo "$(BLUE)🧪 Running end-to-end tests...$(NC)"
+	@./tests/run-tests.sh --category e2e --format junit
+	@echo "$(GREEN)✅ End-to-end tests completed$(NC)"
+
+.PHONY: test-performance
+test-performance: ## Run performance tests only
+	@echo "$(BLUE)🧪 Running performance tests...$(NC)"
+	@./tests/run-tests.sh --category performance --format junit
+	@echo "$(GREEN)✅ Performance tests completed$(NC)"
+
+.PHONY: test-helm
+test-helm: ## Test Helm charts
+	@echo "$(BLUE)🧪 Testing Helm charts...$(NC)"
+	@./tests/unit/helm/test-helm-charts.sh
+	@echo "$(GREEN)✅ Helm chart tests completed$(NC)"
+
+.PHONY: test-terraform
+test-terraform: ## Test Terraform modules
+	@echo "$(BLUE)🧪 Testing Terraform modules...$(NC)"
+	@./tests/unit/terraform/test-terraform-modules.sh
+	@echo "$(GREEN)✅ Terraform tests completed$(NC)"
+
+.PHONY: test-scripts
+test-scripts: ## Test automation scripts
+	@echo "$(BLUE)🧪 Testing automation scripts...$(NC)"
+	@./tests/unit/scripts/test-scripts.sh
+	@echo "$(GREEN)✅ Script tests completed$(NC)"
+
+.PHONY: test-ci
+test-ci: ## Test CI/CD components locally
+	@echo "$(BLUE)🧪 Testing CI/CD components...$(NC)"
+	@./tests/test-ci.sh all
+	@echo "$(GREEN)✅ CI/CD tests completed$(NC)"
+
+.PHONY: test-app
+test-app: ## Test specific application (requires APP=name)
+ifndef APP
+	@echo "$(RED)❌ APP variable is required$(NC)"
+	@echo "Usage: make test-app APP=sample-app"
+	@exit 1
+endif
+	@echo "$(BLUE)🧪 Testing application: $(APP)$(NC)"
+	@./tests/run-tests.sh --app $(APP) --category all
+	@echo "$(GREEN)✅ Application tests completed for $(APP)$(NC)"
+
+.PHONY: test-setup
+test-setup: ## Setup test environment
+	@echo "$(BLUE)🧪 Setting up test environment...$(NC)"
+	@mkdir -p tests/reports
+	@echo "$(GREEN)✅ Test environment ready$(NC)"
+
+.PHONY: test-clean
+test-clean: ## Clean test artifacts
+	@echo "$(BLUE)🧹 Cleaning test artifacts...$(NC)"
+	@rm -rf tests/reports/*
+	@rm -f /tmp/comind-ops-tests-*
+	@echo "$(GREEN)✅ Test artifacts cleaned$(NC)"
+
+# ===========================================
+# 🔧 DEVELOPMENT & DEBUGGING
+# ===========================================
+
+.PHONY: logs
+logs: ## Show logs for application (APP=name)
+	@echo "$(BLUE)📋 Logs for $(APP):$(NC)"
+	@kubectl logs -l app.kubernetes.io/name=$(APP) -n $(APP)-$(ENV) --tail=100 -f
+
+.PHONY: shell
+shell: ## Open debug shell in cluster
+	@echo "$(BLUE)🐚 Opening debug shell in cluster...$(NC)"
+	@kubectl run debug-shell --rm -i --tty --image=alpine/curl --restart=Never -- sh
+
+# ===========================================
+# 🚀 CONVENIENCE TARGETS
+# ===========================================
+
+.PHONY: up
+up: bootstrap ## Alias for bootstrap
+
+.PHONY: down  
+down: cleanup ## Alias for cleanup

@@ -1,0 +1,156 @@
+---
+# ArgoCD Project for comind-ops Platform
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: comind-ops-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: comind-ops-platform
+    app.kubernetes.io/component: project
+spec:
+  # Project description
+  description: "comind-ops Platform project for managing infrastructure and applications"
+  
+  # Source repositories allowed for this project
+  sourceRepos:
+  - 'https://github.com/your-org/comind-ops-cloud-setup'
+  - 'https://github.com/your-org/*'  # Allow other org repos
+  - 'https://helm.elastic.co'  # Elastic Helm charts
+  - 'https://prometheus-community.github.io/helm-charts'  # Prometheus
+  - 'https://grafana.github.io/helm-charts'  # Grafana
+  - 'https://kubernetes.github.io/ingress-nginx'  # Ingress Nginx
+  - 'https://charts.bitnami.com/bitnami'  # Bitnami charts
+  
+  # Destination clusters and namespaces
+  destinations:
+  # Local cluster
+  - server: https://kubernetes.default.svc
+    namespace: platform-dev
+  - server: https://kubernetes.default.svc
+    namespace: platform-stage
+  - server: https://kubernetes.default.svc
+    namespace: platform-prod
+  - server: https://kubernetes.default.svc
+    namespace: monitoring
+  - server: https://kubernetes.default.svc
+    namespace: backup-system
+  - server: https://kubernetes.default.svc
+    namespace: 'sample-app*'  # Allow sample app namespaces
+  - server: https://kubernetes.default.svc
+    namespace: '*'  # Allow any namespace for flexibility
+  
+  # Cluster resource whitelist
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: ''
+    kind: ClusterRole
+  - group: ''
+    kind: ClusterRoleBinding
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRole
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRoleBinding
+  - group: 'apiextensions.k8s.io'
+    kind: CustomResourceDefinition
+  - group: 'admissionregistration.k8s.io'
+    kind: MutatingWebhookConfiguration
+  - group: 'admissionregistration.k8s.io'
+    kind: ValidatingWebhookConfiguration
+  - group: 'networking.k8s.io'
+    kind: NetworkPolicy
+  - group: 'policy'
+    kind: PodSecurityPolicy
+  - group: 'metallb.io'
+    kind: IPAddressPool
+  - group: 'metallb.io'
+    kind: L2Advertisement
+  
+  # Namespace resource whitelist (what can be deployed in namespaces)
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: ConfigMap
+  - group: ''
+    kind: Secret
+  - group: ''
+    kind: Service
+  - group: ''
+    kind: ServiceAccount
+  - group: ''
+    kind: PersistentVolumeClaim
+  - group: ''
+    kind: Pod
+  - group: 'apps'
+    kind: Deployment
+  - group: 'apps'
+    kind: StatefulSet
+  - group: 'apps'
+    kind: DaemonSet
+  - group: 'apps'
+    kind: ReplicaSet
+  - group: 'batch'
+    kind: Job
+  - group: 'batch'
+    kind: CronJob
+  - group: 'networking.k8s.io'
+    kind: Ingress
+  - group: 'networking.k8s.io'
+    kind: NetworkPolicy
+  - group: 'rbac.authorization.k8s.io'
+    kind: Role
+  - group: 'rbac.authorization.k8s.io'
+    kind: RoleBinding
+  - group: 'autoscaling'
+    kind: HorizontalPodAutoscaler
+  - group: 'policy'
+    kind: PodDisruptionBudget
+  - group: 'bitnami.com'
+    kind: SealedSecret
+  
+  # Sync windows (when automatic sync is allowed)
+  syncWindows:
+  - kind: allow
+    schedule: '* * * * *'  # Always allow for development
+    duration: 24h
+    applications:
+    - '*'
+    manualSync: true
+    
+  # Roles for this project
+  roles:
+  # Platform admin role
+  - name: admin
+    description: "Full access to platform applications"
+    policies:
+    - p, proj:comind-ops-platform:admin, applications, *, comind-ops-platform/*, allow
+    - p, proj:comind-ops-platform:admin, repositories, *, *, allow
+    - p, proj:comind-ops-platform:admin, logs, get, comind-ops-platform/*, allow
+    - p, proj:comind-ops-platform:admin, exec, create, comind-ops-platform/*, allow
+    groups:
+    - platform-admins
+  
+  # Developer role  
+  - name: developer
+    description: "Developer access to platform applications"
+    policies:
+    - p, proj:comind-ops-platform:developer, applications, get, comind-ops-platform/*, allow
+    - p, proj:comind-ops-platform:developer, applications, sync, comind-ops-platform/*, allow
+    - p, proj:comind-ops-platform:developer, applications, override, comind-ops-platform/*, allow
+    - p, proj:comind-ops-platform:developer, applications, action/*, comind-ops-platform/*, allow
+    - p, proj:comind-ops-platform:developer, logs, get, comind-ops-platform/*, allow
+    groups:
+    - platform-developers
+  
+  # ReadOnly role
+  - name: readonly
+    description: "Read-only access to platform applications"
+    policies:
+    - p, proj:comind-ops-platform:readonly, applications, get, comind-ops-platform/*, allow
+    - p, proj:comind-ops-platform:readonly, logs, get, comind-ops-platform/*, allow
+    groups:
+    - platform-viewers
+
+  # Signature keys (for signed commits)
+  signatureKeys:
+  - keyID: ""  # Add GPG key IDs here if using signed commits

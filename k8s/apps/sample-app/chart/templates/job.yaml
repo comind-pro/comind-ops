@@ -1,0 +1,74 @@
+{{- if .Values.jobs }}
+{{- range .Values.jobs }}
+{{- if .enabled }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "sample-app.fullname" $ }}-{{ .name }}
+  labels:
+    {{- include "sample-app.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ .name }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  template:
+    metadata:
+      labels:
+        {{- include "sample-app.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ .name }}
+    spec:
+      restartPolicy: {{ .restartPolicy | default "OnFailure" }}
+      containers:
+      - name: {{ .name }}
+        image: {{ .image }}
+        {{- if .command }}
+        command:
+          {{- toYaml .command | nindent 10 }}
+        {{- end }}
+        {{- if .args }}
+        args:
+          {{- toYaml .args | nindent 10 }}
+        {{- end }}
+        env:
+        - name: JOB_NAME
+          value: {{ .name | quote }}
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        # Add any additional environment variables from the main deployment
+        {{- range $key, $value := $.Values.env }}
+        - name: {{ $key }}
+          value: {{ $value | quote }}
+        {{- end }}
+        # Secret environment variables
+        {{- range $key, $value := $.Values.secretEnv }}
+        {{- if $value }}
+        - name: {{ $key }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "sample-app.fullname" $ }}-secrets
+              key: {{ $key }}
+        {{- end }}
+        {{- end }}
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+  backoffLimit: {{ .backoffLimit | default 3 }}
+  ttlSecondsAfterFinished: 3600  # Clean up after 1 hour
+{{- end }}
+{{- end }}
+{{- end }}

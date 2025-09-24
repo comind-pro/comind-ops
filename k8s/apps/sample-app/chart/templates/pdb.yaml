@@ -1,0 +1,20 @@
+{{- if .Values.podDisruptionBudget.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "sample-app.fullname" . }}
+  labels:
+    {{- include "sample-app.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+spec:
+  {{- if .Values.podDisruptionBudget.minAvailable }}
+  minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
+  {{- end }}
+  {{- if .Values.podDisruptionBudget.maxUnavailable }}
+  maxUnavailable: {{ .Values.podDisruptionBudget.maxUnavailable }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sample-app.selectorLabels" . | nindent 6 }}
+{{- end }}

@@ -1,0 +1,274 @@
+# ArgoCD Helm Values for comind-ops Platform
+# Version: v2.9.3 (LTS)
+
+global:
+  # Domain configuration
+  domain: argocd.dev.127.0.0.1.nip.io
+
+# ArgoCD Configuration
+configs:
+  # Parameters
+  params:
+    # Enable insecure mode for local development
+    server.insecure: true
+    
+    # Enable application in any namespace
+    application.namespaces: "*"
+    
+    # Enable web-based terminal
+    exec.enabled: true
+    
+    # Repository server configuration
+    repo.server: true
+    
+    # Controller configuration  
+    controller.diff.server.side: true
+    controller.resource.customizations: |
+      argoproj.io/Application:
+        ignoreDifferences: |
+          jsonPointers:
+          - /spec/source/targetRevision
+
+  # Configuration management
+  cm:
+    # Application instance label key
+    application.instanceLabelKey: argocd.argoproj.io/instance
+    
+    # Server configuration
+    url: http://argocd.dev.127.0.0.1.nip.io:8080
+    
+    # Repository configuration
+    repositories: |
+      - url: https://github.com/your-org/comind-ops-cloud-setup
+        name: comind-ops-platform
+        type: git
+    
+    # Resource customizations
+    resource.customizations: |
+      argoproj.io/Application:
+        health.lua: |
+          hs = {}
+          hs.status = "Healthy"
+          return hs
+
+  # RBAC configuration
+  rbac:
+    policy.default: role:readonly
+    policy.csv: |
+      # Admin policy
+      p, role:admin, applications, *, */*, allow
+      p, role:admin, clusters, *, *, allow
+      p, role:admin, repositories, *, *, allow
+      p, role:admin, accounts, *, *, allow
+      p, role:admin, certificates, *, *, allow
+      p, role:admin, gpgkeys, *, *, allow
+      p, role:admin, logs, *, *, allow
+      p, role:admin, exec, *, *, allow
+      
+      # Developer policy
+      p, role:developer, applications, get, */*, allow
+      p, role:developer, applications, sync, */*, allow
+      p, role:developer, applications, override, */*, allow
+      p, role:developer, applications, action/*, */*, allow
+      p, role:developer, logs, get, */*, allow
+      p, role:developer, exec, create, */*, allow
+      
+      # ReadOnly policy (default)
+      p, role:readonly, applications, get, */*, allow
+      p, role:readonly, repositories, get, *, allow
+      p, role:readonly, clusters, get, *, allow
+      p, role:readonly, logs, get, */*, allow
+      
+      # Group bindings (customize these for your organization)
+      g, argocd-admins, role:admin
+      g, platform-developers, role:developer
+
+  # Secret for repository credentials (will be created via sealed secrets)
+  secret:
+    createSecret: true
+    githubSecret: ""
+    gitlabSecret: ""
+
+# Server configuration
+server:
+  # Replica count
+  replicas: 1
+  
+  # Autoscaling
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 3
+  
+  # Resources
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  # Ingress configuration
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: argocd.dev.127.0.0.1.nip.io
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+      nginx.ingress.kubernetes.io/server-snippet: |
+        grpc_read_timeout 300;
+        grpc_send_timeout 300;
+        client_body_timeout 60;
+        client_header_timeout 60;
+        client_max_body_size 10m;
+    
+    # TLS configuration (disabled for local development)
+    tls: false
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+  
+  # Additional configuration
+  config:
+    url: http://argocd.dev.127.0.0.1.nip.io:8080
+    oidc.config: ""
+
+# Repository server configuration
+repoServer:
+  replicas: 1
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  # Mount repository credentials
+  volumes:
+  - name: custom-tools
+    emptyDir: {}
+  
+  volumeMounts:
+  - mountPath: /custom-tools
+    name: custom-tools
+  
+  # Environment variables for repository access
+  env:
+  - name: HELM_CACHE_HOME
+    value: /tmp/.helm
+  - name: HELM_CONFIG_HOME
+    value: /tmp/.helm
+  - name: HELM_DATA_HOME
+    value: /tmp/.helm
+
+# Controller configuration
+controller:
+  replicas: 1
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+  
+  # Metrics
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+  
+  # Application controller configuration
+  env:
+  - name: ARGOCD_CONTROLLER_REPLICAS
+    value: "1"
+
+# Dex (OIDC) configuration
+dex:
+  enabled: true
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "50m"
+    limits:
+      memory: "256Mi"
+      cpu: "100m"
+
+# ApplicationSet controller
+applicationSet:
+  enabled: true
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"  
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+  
+  # Metrics
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false
+
+# Notifications controller
+notifications:
+  enabled: false
+
+# Redis configuration
+redis:
+  enabled: true
+  
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# Additional security configuration
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 999
+  seccompProfile:
+    type: RuntimeDefault
+
+# Node selection and tolerations
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Create ClusterRoleBinding for ArgoCD to manage applications
+createClusterRoles: true
+
+# Additional manifests
+extraObjects:
+- apiVersion: v1
+  kind: ConfigMap
+  metadata:
+    name: argocd-cmd-params-cm
+    namespace: argocd
+    labels:
+      app.kubernetes.io/name: argocd-cmd-params-cm
+      app.kubernetes.io/part-of: argocd
+  data:
+    # Enable application in any namespace
+    application.namespaces: "*"
+    
+    # Enable cascaded deletion
+    controller.deletion.mode: "background"
+    
+    # Application controller settings
+    controller.status.processors: "20"
+    controller.operation.processors: "10"
+    controller.self.heal.timeout.seconds: "5"
+    controller.repo.server.timeout.seconds: "60"

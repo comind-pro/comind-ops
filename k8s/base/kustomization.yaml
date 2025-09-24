@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespaces.yaml
+  - rbac.yaml
+  - resource-quotas.yaml
+  - limit-ranges.yaml
+  - network-policies.yaml
+  - pod-security.yaml
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: comind-ops-platform
+
+namespace: default
+
+# Optional: Add common annotations
+commonAnnotations:
+  comind-ops.io/version: "1.0.0"
+  comind-ops.io/managed-by: "infrastructure-team"
+

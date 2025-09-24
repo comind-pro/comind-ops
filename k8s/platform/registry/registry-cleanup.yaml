@@ -1,0 +1,207 @@
+---
+# Registry Cleanup CronJob using regctl
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: registry-cleanup
+  namespace: platform-dev
+  labels:
+    app: docker-registry
+    component: cleanup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app: docker-registry
+            component: cleanup
+        spec:
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+          containers:
+          - name: regctl-cleanup
+            image: regclient/regctl:v0.5.7
+            imagePullPolicy: IfNotPresent
+            command: ["/bin/sh"]
+            args:
+            - -c
+            - |
+              set -e
+              echo "Starting registry cleanup at $(date)"
+              
+              REGISTRY_URL="docker-registry.platform-dev.svc.cluster.local:5000"
+              
+              # Get list of repositories
+              echo "Fetching repository list..."
+              REPOS=$(regctl repo ls "${REGISTRY_URL}")
+              
+              for repo in $REPOS; do
+                echo "Processing repository: $repo"
+                
+                # Get all tags for the repository
+                TAGS=$(regctl tag ls "${REGISTRY_URL}/${repo}")
+                
+                # Convert tags to array and sort by date (assuming semantic versioning)
+                echo "$TAGS" | sort -V > /tmp/tags_sorted
+                
+                # Count total tags
+                TOTAL_TAGS=$(echo "$TAGS" | wc -l)
+                echo "Repository $repo has $TOTAL_TAGS tags"
+                
+                # Keep only the latest 10 tags (adjust as needed)
+                KEEP_COUNT=10
+                
+                if [ "$TOTAL_TAGS" -gt "$KEEP_COUNT" ]; then
+                  DELETE_COUNT=$((TOTAL_TAGS - KEEP_COUNT))
+                  echo "Will delete $DELETE_COUNT old tags from $repo"
+                  
+                  # Get tags to delete (all except the last KEEP_COUNT)
+                  head -n "$DELETE_COUNT" /tmp/tags_sorted | while read -r tag; do
+                    echo "Deleting ${REGISTRY_URL}/${repo}:${tag}"
+                    regctl image delete "${REGISTRY_URL}/${repo}:${tag}" --force-tag-deref
+                  done
+                else
+                  echo "Repository $repo has $TOTAL_TAGS tags, keeping all (threshold: $KEEP_COUNT)"
+                fi
+              done
+              
+              echo "Registry cleanup completed at $(date)"
+            env:
+            - name: REGCTL_CONFIG_DIR
+              value: /tmp/regctl
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            resources:
+              requests:
+                memory: "128Mi"
+                cpu: "100m"
+              limits:
+                memory: "256Mi"
+                cpu: "200m"
+            volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: regctl-config
+              mountPath: /tmp/regctl
+          volumes:
+          - name: tmp
+            emptyDir: {}
+          - name: regctl-config
+            emptyDir: {}
+---
+# Advanced cleanup script ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: registry-cleanup-script
+  namespace: platform-dev
+  labels:
+    app: docker-registry
+    component: cleanup
+data:
+  cleanup.sh: |
+    #!/bin/bash
+    set -e
+    
+    REGISTRY_URL="docker-registry.platform-dev.svc.cluster.local:5000"
+    KEEP_COUNT=${KEEP_COUNT:-10}
+    MAX_AGE_DAYS=${MAX_AGE_DAYS:-30}
+    DRY_RUN=${DRY_RUN:-false}
+    
+    echo "=== Registry Cleanup Configuration ==="
+    echo "Registry URL: $REGISTRY_URL"
+    echo "Keep latest: $KEEP_COUNT tags per repository"
+    echo "Max age: $MAX_AGE_DAYS days"
+    echo "Dry run: $DRY_RUN"
+    echo "======================================"
+    
+    cleanup_by_count() {
+      local repo=$1
+      local tags_file=$2
+      
+      local total_tags=$(wc -l < "$tags_file")
+      
+      if [ "$total_tags" -gt "$KEEP_COUNT" ]; then
+        local delete_count=$((total_tags - KEEP_COUNT))
+        echo "Repository $repo: Deleting $delete_count old tags (keeping latest $KEEP_COUNT)"
+        
+        head -n "$delete_count" "$tags_file" | while read -r tag; do
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "[DRY-RUN] Would delete: ${REGISTRY_URL}/${repo}:${tag}"
+          else
+            echo "Deleting: ${REGISTRY_URL}/${repo}:${tag}"
+            regctl image delete "${REGISTRY_URL}/${repo}:${tag}" --force-tag-deref
+          fi
+        done
+      else
+        echo "Repository $repo: Has $total_tags tags, keeping all (threshold: $KEEP_COUNT)"
+      fi
+    }
+    
+    cleanup_by_age() {
+      local repo=$1
+      
+      echo "Checking for images older than $MAX_AGE_DAYS days in $repo"
+      
+      # Get manifest details for age-based cleanup
+      regctl tag ls "$REGISTRY_URL/$repo" | while read -r tag; do
+        # Get image creation date
+        created_date=$(regctl image inspect "$REGISTRY_URL/$repo:$tag" --format '{{.Created}}' 2>/dev/null || echo "")
+        
+        if [ -n "$created_date" ]; then
+          # Calculate age (this is a simplified version - in production, use proper date parsing)
+          echo "Tag $tag created: $created_date"
+        fi
+      done
+    }
+    
+    main() {
+      echo "Starting registry cleanup at $(date)"
+      
+      # Test registry connectivity
+      if ! regctl version; then
+        echo "ERROR: regctl not working properly"
+        exit 1
+      fi
+      
+      # Get repository list
+      echo "Fetching repository list from $REGISTRY_URL..."
+      repos=$(regctl repo ls "$REGISTRY_URL" 2>/dev/null || true)
+      
+      if [ -z "$repos" ]; then
+        echo "No repositories found or registry not accessible"
+        exit 0
+      fi
+      
+      for repo in $repos; do
+        echo "Processing repository: $repo"
+        
+        # Get tags sorted by creation date (oldest first)
+        tags_file="/tmp/tags_${repo//\//_}"
+        regctl tag ls "$REGISTRY_URL/$repo" | sort > "$tags_file"
+        
+        # Cleanup by count
+        cleanup_by_count "$repo" "$tags_file"
+        
+        # Optional: cleanup by age (uncomment to enable)
+        # cleanup_by_age "$repo"
+        
+        rm -f "$tags_file"
+      done
+      
+      echo "Registry cleanup completed at $(date)"
+    }
+    
+    main "$@"

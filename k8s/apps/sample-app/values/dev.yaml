@@ -1,0 +1,146 @@
+# Development environment configuration
+# This demonstrates platform capabilities with relaxed security for development
+
+# Global configuration
+global:
+  environment: dev
+  domain: dev.127.0.0.1.nip.io
+  namespace: sample-app-dev
+
+# Application scaling
+replicaCount: 1
+
+# Container image configuration  
+image:
+  repository: nginx
+  pullPolicy: Always
+  tag: "1.21-alpine"
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+  hosts:
+    - host: sample-app.dev.127.0.0.1.nip.io
+      paths:
+        - path: /
+          pathType: Prefix
+        - path: /api
+          pathType: Prefix
+        - path: /health
+          pathType: Prefix
+
+# Resources (development values - more relaxed)
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# Autoscaling disabled for development
+autoscaling:
+  enabled: false
+
+# Persistence enabled but small
+persistence:
+  enabled: true
+  size: 1Gi
+
+# Environment variables
+env:
+  NODE_ENV: development
+  PORT: "8080"
+  LOG_LEVEL: debug
+  APP_NAME: sample-app
+  APP_VERSION: "1.0.0"
+  ENABLE_METRICS: "true"
+  ENABLE_TRACING: "false"
+  ENABLE_DEBUG: "true"
+
+# Platform service integrations (enabled for demo)
+platformServices:
+  database:
+    enabled: true
+    host: postgres.platform-dev.svc.cluster.local
+    port: 5432
+    name: sampleapp_dev
+    pool:
+      min: 1
+      max: 5
+  
+  queue:
+    enabled: true
+    host: elasticmq.platform-dev.svc.cluster.local
+    port: 9324
+    region: elasticmq
+    queues:
+      - default
+      - notifications
+  
+  storage:
+    enabled: true
+    endpoint: minio.platform-dev.svc.cluster.local:9000
+    secure: false
+    buckets:
+      - sample-app-uploads-dev
+      - sample-app-backups-dev
+
+  cache:
+    enabled: false
+
+# Monitoring configuration
+monitoring:
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+
+# Network policy (less restrictive for development)
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: sample-app-dev
+  egress:
+    - to:
+      - namespaceSelector:
+          matchLabels:
+            name: platform-dev
+    - to: []
+      ports:
+      - protocol: UDP
+        port: 53   # DNS
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false  # Disabled for single replica
+
+# Jobs configuration
+jobs:
+  - name: db-seed
+    enabled: true
+    image: postgres:15-alpine
+    restartPolicy: OnFailure
+    backoffLimit: 3

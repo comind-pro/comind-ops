@@ -1,0 +1,435 @@
+name: "Terraform - Infrastructure Management"
+
+on:
+  push:
+    paths:
+      - 'infra/terraform/**'
+      - '.github/workflows/terraform.yml'
+  pull_request:
+    paths:
+      - 'infra/terraform/**'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform action'
+        required: true
+        default: 'plan'
+        type: choice
+        options:
+          - plan
+          - apply
+          - destroy
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - stage
+          - prod
+      module:
+        description: 'Terraform module to target'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - core
+          - app_skel
+          - platform
+
+env:
+  TERRAFORM_VERSION: 1.5.7
+  TF_VAR_environment: ${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  # ===========================================
+  # TERRAFORM PLAN
+  # ===========================================
+  
+  plan:
+    name: "📋 Terraform Plan"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'plan')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Core Infrastructure"
+            path: "infra/terraform/core"
+            workspace: "dev"
+          - name: "App Skeleton Module"
+            path: "infra/terraform/modules/app_skel"
+            workspace: "default"
+          - name: "Platform Environment"
+            path: "infra/terraform/envs/dev/platform"
+            workspace: "dev"
+    steps:
+      - name: "📥 Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "🔧 Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: "🏃 Terraform Init"
+        working-directory: ${{ matrix.path }}
+        run: |
+          echo "🏃 Initializing Terraform in ${{ matrix.path }}..."
+          terraform init -input=false
+          echo "✅ Terraform initialized"
+
+      - name: "🏗️ Select/Create Workspace"
+        working-directory: ${{ matrix.path }}
+        run: |
+          if [ "${{ matrix.workspace }}" != "default" ]; then
+            echo "🏗️ Managing workspace: ${{ matrix.workspace }}"
+            terraform workspace select ${{ matrix.workspace }} || terraform workspace new ${{ matrix.workspace }}
+          fi
+
+      - name: "📋 Terraform Plan"
+        id: plan
+        working-directory: ${{ matrix.path }}
+        run: |
+          echo "📋 Running Terraform plan..."
+          terraform plan -detailed-exitcode -out=tfplan -input=false \
+            -var="cluster_type=local" \
+            -var="environment=${{ env.TF_VAR_environment }}" \
+            2>&1 | tee plan_output.txt
+          
+          # Capture exit code
+          PLAN_EXIT_CODE=${PIPESTATUS[0]}
+          echo "plan_exit_code=$PLAN_EXIT_CODE" >> $GITHUB_OUTPUT
+          
+          # Parse plan output for summary
+          PLAN_SUMMARY=$(grep -E "(Plan:|No changes)" plan_output.txt || echo "Plan generated")
+          echo "plan_summary=$PLAN_SUMMARY" >> $GITHUB_OUTPUT
+          
+          exit $PLAN_EXIT_CODE
+
+      - name: "📊 Upload Plan Artifact"
+        if: steps.plan.outputs.plan_exit_code == '2'
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-plan-${{ github.sha }}-${{ matrix.name }}
+          path: |
+            ${{ matrix.path }}/tfplan
+            ${{ matrix.path }}/plan_output.txt
+          retention-days: 5
+
+      - name: "💬 Comment Plan Results"
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const output = `
+            ## 📋 Terraform Plan Results - ${{ matrix.name }}
+            
+            **Status:** ${{ steps.plan.outcome == 'success' && '✅ Success' || '❌ Failed' }}
+            **Exit Code:** ${{ steps.plan.outputs.plan_exit_code }}
+            **Summary:** ${{ steps.plan.outputs.plan_summary }}
+            
+            <details>
+            <summary>Show Plan Details</summary>
+            
+            \`\`\`
+            ${{ steps.plan.outputs.plan_exit_code == '2' && 'Changes detected - see plan artifact' || 'No changes detected' }}
+            \`\`\`
+            
+            </details>
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+  # ===========================================
+  # TERRAFORM APPLY
+  # ===========================================
+  
+  apply:
+    name: "🚀 Terraform Apply"
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
+    environment:
+      name: ${{ github.event.inputs.environment || 'dev' }}
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        include:
+          - name: "Core Infrastructure"
+            path: "infra/terraform/core"
+            workspace: "dev"
+            depends_on: []
+          - name: "Platform Environment"
+            path: "infra/terraform/envs/dev/platform"
+            workspace: "dev"
+            depends_on: ["Core Infrastructure"]
+    steps:
+      - name: "📥 Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "🔧 Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      - name: "🏃 Terraform Init"
+        working-directory: ${{ matrix.path }}
+        run: |
+          echo "🏃 Initializing Terraform..."
+          terraform init -input=false
+          
+          if [ "${{ matrix.workspace }}" != "default" ]; then
+            terraform workspace select ${{ matrix.workspace }} || terraform workspace new ${{ matrix.workspace }}
+          fi
+
+      - name: "📋 Terraform Plan"
+        working-directory: ${{ matrix.path }}
+        run: |
+          echo "📋 Generating fresh plan before apply..."
+          terraform plan -out=tfplan -input=false \
+            -var="cluster_type=local" \
+            -var="environment=${{ env.TF_VAR_environment }}"
+
+      - name: "🚀 Terraform Apply"
+        working-directory: ${{ matrix.path }}
+        run: |
+          echo "🚀 Applying Terraform changes..."
+          terraform apply -input=false tfplan
+          echo "✅ Terraform apply completed"
+
+      - name: "📤 Export Outputs"
+        working-directory: ${{ matrix.path }}
+        run: |
+          echo "📤 Exporting Terraform outputs..."
+          terraform output -json > outputs.json
+          
+          # Display key outputs
+          if [ -s outputs.json ] && [ "$(cat outputs.json)" != "{}" ]; then
+            echo "Key outputs:"
+            terraform output
+          fi
+
+      - name: "📊 Upload Outputs"
+        uses: actions/upload-artifact@v3
+        with:
+          name: terraform-outputs-${{ matrix.name }}-${{ github.sha }}
+          path: ${{ matrix.path }}/outputs.json
+          retention-days: 30
+
+  # ===========================================
+  # TERRAFORM DESTROY
+  # ===========================================
+  
+  destroy:
+    name: "💥 Terraform Destroy"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
+    environment:
+      name: ${{ github.event.inputs.environment }}-destroy
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: "Platform Environment"
+            path: "infra/terraform/envs/dev/platform"
+            workspace: "dev"
+          - name: "Core Infrastructure"
+            path: "infra/terraform/core"
+            workspace: "dev"
+    steps:
+      - name: "⚠️ Destruction Confirmation"
+        run: |
+          echo "⚠️ WARNING: This will destroy infrastructure in ${{ github.event.inputs.environment }}"
+          echo "Environment: ${{ github.event.inputs.environment }}"
+          echo "Module: ${{ matrix.name }}"
+          echo "This action cannot be undone!"
+
+      - name: "📥 Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "🔧 Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: "🏃 Terraform Init"
+        working-directory: ${{ matrix.path }}
+        run: |
+          terraform init -input=false
+          
+          if [ "${{ matrix.workspace }}" != "default" ]; then
+            terraform workspace select ${{ matrix.workspace }}
+          fi
+
+      - name: "📋 Terraform Plan Destroy"
+        working-directory: ${{ matrix.path }}
+        run: |
+          echo "📋 Planning destruction..."
+          terraform plan -destroy -out=destroy-plan \
+            -var="cluster_type=local" \
+            -var="environment=${{ env.TF_VAR_environment }}"
+
+      - name: "💥 Terraform Destroy"
+        working-directory: ${{ matrix.path }}
+        run: |
+          echo "💥 Destroying infrastructure..."
+          terraform apply destroy-plan
+          echo "✅ Infrastructure destroyed"
+
+  # ===========================================
+  # SECURITY & COMPLIANCE
+  # ===========================================
+  
+  security:
+    name: "🔒 Security & Compliance Scan"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    steps:
+      - name: "📥 Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "🔧 Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: "🔒 Security Scan with Checkov"
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: infra/terraform
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov.sarif
+          quiet: true
+          soft_fail: true
+
+      - name: "📊 Upload Security Results"
+        if: always()
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: checkov.sarif
+
+      - name: "🔍 Terraform Security Scan with tfsec"
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          working_directory: infra/terraform
+          soft_fail: true
+
+      - name: "📋 Generate Security Report"
+        if: always()
+        run: |
+          echo "📋 Security Scan Report" > security-report.md
+          echo "======================" >> security-report.md
+          echo "Scanned at: $(date)" >> security-report.md
+          echo "Repository: ${{ github.repository }}" >> security-report.md
+          echo "Commit: ${{ github.sha }}" >> security-report.md
+          echo "" >> security-report.md
+          echo "Tools used:" >> security-report.md
+          echo "- Checkov (Infrastructure as Code security)" >> security-report.md
+          echo "- tfsec (Terraform security scanner)" >> security-report.md
+          echo "" >> security-report.md
+          echo "✅ Security scan completed" >> security-report.md
+          
+          cat security-report.md
+
+  # ===========================================
+  # DRIFT DETECTION
+  # ===========================================
+  
+  drift:
+    name: "🔄 Infrastructure Drift Detection"
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'drift')
+    strategy:
+      matrix:
+        include:
+          - name: "Core Infrastructure"
+            path: "infra/terraform/core"
+            workspace: "dev"
+          - name: "Platform Environment"
+            path: "infra/terraform/envs/dev/platform"
+            workspace: "dev"
+    steps:
+      - name: "📥 Checkout Code"
+        uses: actions/checkout@v4
+
+      - name: "🔧 Setup Terraform"
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: "🏃 Terraform Init"
+        working-directory: ${{ matrix.path }}
+        run: |
+          terraform init -input=false
+          
+          if [ "${{ matrix.workspace }}" != "default" ]; then
+            terraform workspace select ${{ matrix.workspace }}
+          fi
+
+      - name: "🔄 Drift Detection"
+        working-directory: ${{ matrix.path }}
+        run: |
+          echo "🔄 Checking for infrastructure drift..."
+          
+          terraform plan -detailed-exitcode -input=false \
+            -var="cluster_type=local" \
+            -var="environment=dev" \
+            > drift_output.txt 2>&1
+          
+          DRIFT_EXIT_CODE=$?
+          
+          if [ $DRIFT_EXIT_CODE -eq 2 ]; then
+            echo "⚠️ Infrastructure drift detected in ${{ matrix.name }}!"
+            cat drift_output.txt
+            exit 1
+          elif [ $DRIFT_EXIT_CODE -eq 0 ]; then
+            echo "✅ No infrastructure drift detected in ${{ matrix.name }}"
+          else
+            echo "❌ Error checking for drift in ${{ matrix.name }}"
+            cat drift_output.txt
+            exit 1
+          fi
+
+      - name: "📊 Upload Drift Report"
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: drift-report-${{ matrix.name }}-${{ github.sha }}
+          path: ${{ matrix.path }}/drift_output.txt
+
+  # ===========================================
+  # SUMMARY
+  # ===========================================
+  
+  summary:
+    name: "📊 Terraform Summary"
+    runs-on: ubuntu-latest
+    needs: [plan, apply, security]
+    if: always()
+    steps:
+      - name: "📊 Workflow Summary"
+        run: |
+          echo "📊 Terraform Workflow Summary:"
+          echo "=============================="
+          echo "Plan: ${{ needs.plan.result }}"
+          echo "Apply: ${{ needs.apply.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          echo ""
+          
+          if [[ "${{ needs.plan.result }}" == "success" && \
+                "${{ needs.security.result }}" == "success" ]]; then
+            echo "✅ Terraform validation successful"
+          else
+            echo "⚠️ Some Terraform checks require attention"
+          fi

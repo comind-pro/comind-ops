@@ -1,0 +1,26 @@
+apiVersion: v2
+name: sample-app
+description: "Comprehensive sample application demonstrating Comind-Ops Platform capabilities"
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+maintainers:
+  - name: Comind-Ops Platform Team
+    email: platform@comind-ops.io
+
+keywords:
+  - sample
+  - demo  
+  - comind-ops-platform
+  - microservice
+  - api
+
+home: https://github.com/your-org/comind-ops-cloud-setup
+sources:
+  - https://github.com/your-org/comind-ops-cloud-setup
+
+annotations:
+  category: Sample Applications
+  comind-ops.io/platform-version: "1.0.0"
+  comind-ops.io/integrations: "database,queue,storage,monitoring"
