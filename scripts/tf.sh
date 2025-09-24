@@ -4,6 +4,35 @@ set -euo pipefail
 # Comind-Ops Platform - Terraform Management Script
 # Usage: ./scripts/tf.sh <environment> [app-name] [command] [options]
 
+# Check for help first
+if [[ $# -eq 0 ]] || [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then
+    print_usage() {
+        cat << EOF
+Usage: $0 <environment> [app-name] [command] [options]
+
+Arguments:
+    environment     Target environment (dev, stage, prod)
+    app-name        Application name or 'core' for infrastructure (default: core)
+    command         Terraform command (plan, apply, destroy, output, etc.) (default: plan)
+
+Options:
+    --help          Show this help message
+    --auto-approve  Auto approve for apply/destroy commands
+    --var key=value Set Terraform variable
+    --workspace WS  Terraform workspace (default: environment name)
+
+Examples:
+    $0 dev                           # Plan core infrastructure for dev
+    $0 dev core apply               # Apply core infrastructure  
+    $0 dev my-app plan              # Plan app infrastructure
+    $0 prod my-app apply --auto-approve
+    $0 dev my-app output            # Show outputs
+EOF
+    }
+    print_usage
+    exit 0
+fi
+
 ENVIRONMENT="${1:-}"
 APP_NAME="${2:-core}"
 COMMAND="${3:-plan}"
@@ -17,6 +46,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# Logging functions
+log() { echo -e "${BLUE}[INFO]${NC} $1"; }
+success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
+warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 
 print_usage() {
     cat << EOF
@@ -72,7 +107,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validation
+
+# Validation  
 if [[ -z "$ENVIRONMENT" ]]; then
     error "Environment is required"
     print_usage

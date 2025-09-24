@@ -66,7 +66,7 @@ service:
       port: 9090
       targetPort: 9090
     - name: health
-      port: 8081  
+      port: 8081
       targetPort: 8081
 
 # Ingress configuration (demonstrates platform ingress)
@@ -129,7 +129,7 @@ livenessProbe:
 
 readinessProbe:
   httpGet:
-    path: /ready  
+    path: /ready
     port: http
   initialDelaySeconds: 5
   periodSeconds: 5
@@ -180,11 +180,11 @@ env:
   NODE_ENV: production
   PORT: "8080"
   LOG_LEVEL: info
-  
+
   # Application configuration
   APP_NAME: sample-app
   APP_VERSION: "1.0.0"
-  
+
   # Feature flags
   ENABLE_METRICS: "true"
   ENABLE_TRACING: "true"
@@ -195,11 +195,11 @@ secretEnv:
   # Database secrets
   DATABASE_URL: ""
   DATABASE_PASSWORD: ""
-  
+
   # API keys
   EXTERNAL_API_KEY: ""
   JWT_SECRET: ""
-  
+
   # Service credentials
   REDIS_PASSWORD: ""
   SMTP_PASSWORD: ""
@@ -212,36 +212,36 @@ configMap:
     server.port=8080
     logging.level.root=INFO
     management.endpoints.web.exposure.include=health,metrics,info
-    
+
   # Nginx configuration
   nginx.conf: |
     server {
         listen 8080;
         server_name localhost;
-        
+
         location / {
             root /usr/share/nginx/html;
             index index.html;
         }
-        
+
         location /health {
             access_log off;
             return 200 "healthy\n";
             add_header Content-Type text/plain;
         }
-        
+
         location /ready {
             access_log off;
             return 200 "ready\n";
             add_header Content-Type text/plain;
         }
-        
+
         location /startup {
             access_log off;
             return 200 "started\n";
             add_header Content-Type text/plain;
         }
-        
+
         location /metrics {
             access_log off;
             return 200 "# Sample metrics\nsample_requests_total 123\n";
@@ -260,14 +260,14 @@ platformServices:
     pool:
       min: 2
       max: 10
-  
+
   # Cache integration (Redis) - optional
   cache:
     enabled: false
     host: redis.platform-dev.svc.cluster.local
     port: 6379
     database: 0
-    
+
   # Queue integration (ElasticMQ)
   queue:
     enabled: true
@@ -278,7 +278,7 @@ platformServices:
       - default
       - notifications
       - high-priority
-  
+
   # Storage integration (MinIO)
   storage:
     enabled: true
@@ -290,19 +290,19 @@ platformServices:
 
 # Monitoring configuration
 monitoring:
-  # ServiceMonitor for Prometheus
+  # ServiceMonitor for Prometheus (requires Prometheus Operator)
   serviceMonitor:
-    enabled: true
+    enabled: false
     interval: 30s
     scrapeTimeout: 10s
     labels: {}
-    
+
   # Grafana dashboard
   dashboard:
     enabled: true
     labels:
       grafana_dashboard: "1"
-      
+
 # Network policy (demonstrates platform security)
 networkPolicy:
   enabled: true
@@ -401,8 +401,8 @@ telemetry:
     enabled: false
     jaegerEndpoint: ""
     samplingRate: 0.1
-    
-  # Logging configuration  
+
+  # Logging configuration
   logging:
     level: INFO
     format: json

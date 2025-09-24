@@ -40,22 +40,22 @@ variable "cluster_type" {
 variable "database" {
   description = "Database configuration"
   type = object({
-    enabled          = bool
-    engine           = optional(string, "postgresql")
-    version          = optional(string, "15")
-    instance_class   = optional(string, "db.t3.micro")
-    allocated_storage = optional(number, 20)
-    max_allocated_storage = optional(number, 100)
+    enabled                 = bool
+    engine                  = optional(string, "postgresql")
+    version                 = optional(string, "15")
+    instance_class          = optional(string, "db.t3.micro")
+    allocated_storage       = optional(number, 20)
+    max_allocated_storage   = optional(number, 100)
     backup_retention_period = optional(number, 7)
-    backup_window    = optional(string, "03:00-04:00")
-    maintenance_window = optional(string, "Mon:04:00-Mon:05:00")
-    multi_az         = optional(bool, false)
-    publicly_accessible = optional(bool, false)
-    storage_encrypted = optional(bool, true)
-    deletion_protection = optional(bool, false)
-    skip_final_snapshot = optional(bool, true)
+    backup_window           = optional(string, "03:00-04:00")
+    maintenance_window      = optional(string, "Mon:04:00-Mon:05:00")
+    multi_az                = optional(bool, false)
+    publicly_accessible     = optional(bool, false)
+    storage_encrypted       = optional(bool, true)
+    deletion_protection     = optional(bool, false)
+    skip_final_snapshot     = optional(bool, true)
     # Local k3d configuration
-    local_storage_size = optional(string, "10Gi")
+    local_storage_size  = optional(string, "10Gi")
     local_replica_count = optional(number, 1)
   })
   default = {
@@ -69,15 +69,15 @@ variable "storage" {
   type = object({
     enabled = bool
     buckets = optional(list(object({
-      name                = string
-      versioning_enabled  = optional(bool, true)
-      lifecycle_enabled   = optional(bool, true)
+      name                 = string
+      versioning_enabled   = optional(bool, true)
+      lifecycle_enabled    = optional(bool, true)
       lifecycle_expiration = optional(number, 365)
-      cors_enabled        = optional(bool, false)
-      public_read         = optional(bool, false)
+      cors_enabled         = optional(bool, false)
+      public_read          = optional(bool, false)
     })), [])
     # Local MinIO configuration
-    local_storage_size = optional(string, "20Gi")
+    local_storage_size  = optional(string, "20Gi")
     local_replica_count = optional(number, 1)
   })
   default = {
@@ -91,15 +91,15 @@ variable "queue" {
   type = object({
     enabled = bool
     queues = optional(list(object({
-      name                        = string
+      name                       = string
       delay_seconds              = optional(number, 0)
       max_message_size           = optional(number, 262144)
       message_retention_seconds  = optional(number, 345600)
       receive_wait_time_seconds  = optional(number, 0)
       visibility_timeout_seconds = optional(number, 30)
       # Dead letter queue configuration
-      dlq_enabled               = optional(bool, true)
-      dlq_max_receive_count     = optional(number, 3)
+      dlq_enabled           = optional(bool, true)
+      dlq_max_receive_count = optional(number, 3)
     })), [])
   })
   default = {
@@ -111,7 +111,7 @@ variable "queue" {
 variable "cache" {
   description = "Cache configuration (Redis/ElastiCache)"
   type = object({
-    enabled             = bool
+    enabled            = bool
     node_type          = optional(string, "cache.t3.micro")
     num_cache_nodes    = optional(number, 1)
     port               = optional(number, 6379)
@@ -119,7 +119,7 @@ variable "cache" {
     subnet_group_name  = optional(string, "")
     security_group_ids = optional(list(string), [])
     # Local configuration
-    local_storage_size = optional(string, "1Gi")
+    local_storage_size  = optional(string, "1Gi")
     local_replica_count = optional(number, 1)
   })
   default = {
@@ -131,17 +131,17 @@ variable "cache" {
 variable "networking" {
   description = "Networking configuration"
   type = object({
-    vpc_id                = optional(string, "")
-    subnet_ids           = optional(list(string), [])
-    availability_zones   = optional(list(string), [])
-    ingress_enabled      = optional(bool, true)
-    load_balancer_type   = optional(string, "application") # application, network
-    certificate_arn      = optional(string, "")
-    domain_name          = optional(string, "")
-    subdomain            = optional(string, "")
+    vpc_id             = optional(string, "")
+    subnet_ids         = optional(list(string), [])
+    availability_zones = optional(list(string), [])
+    ingress_enabled    = optional(bool, true)
+    load_balancer_type = optional(string, "application") # application, network
+    certificate_arn    = optional(string, "")
+    domain_name        = optional(string, "")
+    subdomain          = optional(string, "")
     # Local configuration
-    local_domain         = optional(string, "127.0.0.1.nip.io")
-    local_ingress_class  = optional(string, "nginx")
+    local_domain        = optional(string, "127.0.0.1.nip.io")
+    local_ingress_class = optional(string, "nginx")
   })
   default = {}
 }
@@ -150,13 +150,13 @@ variable "networking" {
 variable "monitoring" {
   description = "Monitoring configuration"
   type = object({
-    enabled              = bool
-    prometheus_enabled   = optional(bool, true)
-    grafana_enabled     = optional(bool, true)
-    alerting_enabled    = optional(bool, true)
-    log_retention_days  = optional(number, 30)
+    enabled            = bool
+    prometheus_enabled = optional(bool, true)
+    grafana_enabled    = optional(bool, true)
+    alerting_enabled   = optional(bool, true)
+    log_retention_days = optional(number, 30)
     # CloudWatch configuration
-    cloudwatch_enabled  = optional(bool, false)
+    cloudwatch_enabled   = optional(bool, false)
     cloudwatch_log_group = optional(string, "")
   })
   default = {
@@ -169,16 +169,16 @@ variable "security" {
   description = "Security configuration"
   type = object({
     # IAM configuration
-    create_iam_role     = optional(bool, true)
-    iam_role_name       = optional(string, "")
-    iam_policies        = optional(list(string), [])
+    create_iam_role = optional(bool, true)
+    iam_role_name   = optional(string, "")
+    iam_policies    = optional(list(string), [])
     # Network security
-    security_group_ids  = optional(list(string), [])
+    security_group_ids     = optional(list(string), [])
     create_security_groups = optional(bool, true)
     # Kubernetes RBAC
     create_service_account = optional(bool, true)
-    create_rbac         = optional(bool, true)
-    namespace_isolation = optional(bool, true)
+    create_rbac            = optional(bool, true)
+    namespace_isolation    = optional(bool, true)
   })
   default = {}
 }
@@ -215,21 +215,21 @@ variable "advanced" {
   type = object({
     # Scaling configuration
     enable_autoscaling     = optional(bool, false)
-    min_capacity          = optional(number, 1)
-    max_capacity          = optional(number, 10)
+    min_capacity           = optional(number, 1)
+    max_capacity           = optional(number, 10)
     target_cpu_utilization = optional(number, 70)
-    
+
     # High availability
-    multi_az_deployment   = optional(bool, false)
+    multi_az_deployment       = optional(bool, false)
     cross_zone_load_balancing = optional(bool, true)
-    
+
     # Performance
-    enable_performance_insights = optional(bool, false)
+    enable_performance_insights    = optional(bool, false)
     performance_insights_retention = optional(number, 7)
-    
+
     # Disaster recovery
     enable_cross_region_replication = optional(bool, false)
-    replication_region = optional(string, "")
+    replication_region              = optional(string, "")
   })
   default = {}
 }
@@ -238,10 +238,10 @@ variable "advanced" {
 variable "local_overrides" {
   description = "Local development specific overrides"
   type = object({
-    use_host_storage     = optional(bool, false)
-    host_storage_path    = optional(string, "/tmp/app-data")
-    disable_ssl          = optional(bool, true)
-    enable_debug_mode    = optional(bool, true)
+    use_host_storage         = optional(bool, false)
+    host_storage_path        = optional(string, "/tmp/app-data")
+    disable_ssl              = optional(bool, true)
+    enable_debug_mode        = optional(bool, true)
     resource_limits_disabled = optional(bool, true)
   })
   default = {}

@@ -7,11 +7,11 @@ namespace: platform-dev
 resources:
   # ElasticMQ (SQS-compatible queue service)
   - elasticmq/deployment.yaml
-  
+
   # Docker Registry with retention
   - registry/registry.yaml
   - registry/registry-cleanup.yaml
-  
+
   # Backup services
   - backups/postgres-cronjob.yaml
   - backups/minio-cronjob.yaml

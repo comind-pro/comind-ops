@@ -11,7 +11,7 @@ metadata:
 spec:
   # Project description
   description: "comind-ops Platform project for managing infrastructure and applications"
-  
+
   # Source repositories allowed for this project
   sourceRepos:
   - 'https://github.com/your-org/comind-ops-cloud-setup'
@@ -21,7 +21,7 @@ spec:
   - 'https://grafana.github.io/helm-charts'  # Grafana
   - 'https://kubernetes.github.io/ingress-nginx'  # Ingress Nginx
   - 'https://charts.bitnami.com/bitnami'  # Bitnami charts
-  
+
   # Destination clusters and namespaces
   destinations:
   # Local cluster
@@ -39,7 +39,7 @@ spec:
     namespace: 'sample-app*'  # Allow sample app namespaces
   - server: https://kubernetes.default.svc
     namespace: '*'  # Allow any namespace for flexibility
-  
+
   # Cluster resource whitelist
   clusterResourceWhitelist:
   - group: ''
@@ -66,7 +66,7 @@ spec:
     kind: IPAddressPool
   - group: 'metallb.io'
     kind: L2Advertisement
-  
+
   # Namespace resource whitelist (what can be deployed in namespaces)
   namespaceResourceWhitelist:
   - group: ''
@@ -107,7 +107,7 @@ spec:
     kind: PodDisruptionBudget
   - group: 'bitnami.com'
     kind: SealedSecret
-  
+
   # Sync windows (when automatic sync is allowed)
   syncWindows:
   - kind: allow
@@ -116,7 +116,7 @@ spec:
     applications:
     - '*'
     manualSync: true
-    
+
   # Roles for this project
   roles:
   # Platform admin role
@@ -129,8 +129,8 @@ spec:
     - p, proj:comind-ops-platform:admin, exec, create, comind-ops-platform/*, allow
     groups:
     - platform-admins
-  
-  # Developer role  
+
+  # Developer role
   - name: developer
     description: "Developer access to platform applications"
     policies:
@@ -141,7 +141,7 @@ spec:
     - p, proj:comind-ops-platform:developer, logs, get, comind-ops-platform/*, allow
     groups:
     - platform-developers
-  
+
   # ReadOnly role
   - name: readonly
     description: "Read-only access to platform applications"

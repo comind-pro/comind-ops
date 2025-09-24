@@ -22,7 +22,7 @@ service:
   port: 80
   targetPort: 8080
 
-# Ingress configuration  
+# Ingress configuration
 ingress:
   enabled: true
   className: "nginx"
@@ -95,7 +95,7 @@ platformServices:
     pool:
       min: 10
       max: 50
-  
+
   queue:
     enabled: true
     host: sqs.us-east-1.amazonaws.com
@@ -106,7 +106,7 @@ platformServices:
       - sample-app-prod-notifications
       - sample-app-prod-high-priority
       - sample-app-prod-dlq
-  
+
   storage:
     enabled: true
     endpoint: s3.amazonaws.com

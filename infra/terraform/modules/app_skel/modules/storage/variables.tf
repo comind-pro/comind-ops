@@ -28,7 +28,7 @@ variable "storage_config" {
 variable "storage_buckets" {
   description = "List of storage buckets to create"
   type = list(object({
-    name   = string
+    name = string
     config = object({
       versioning_enabled   = bool
       lifecycle_enabled    = bool

@@ -16,7 +16,7 @@ jobs:
   # ===========================================
   # CODE QUALITY & LINTING
   # ===========================================
-  
+
   lint:
     name: "🧹 Code Quality & Linting"
     runs-on: ubuntu-latest
@@ -67,7 +67,7 @@ jobs:
   # ===========================================
   # TERRAFORM VALIDATION & SECURITY
   # ===========================================
-  
+
   terraform:
     name: "🏗️ Terraform Validation & Security"
     runs-on: ubuntu-latest
@@ -118,7 +118,7 @@ jobs:
   # ===========================================
   # KUBERNETES MANIFEST VALIDATION
   # ===========================================
-  
+
   kubernetes:
     name: "☸️ Kubernetes Manifest Validation"
     runs-on: ubuntu-latest
@@ -132,7 +132,7 @@ jobs:
           curl -LO "https://dl.k8s.io/release/v${{ env.KUBERNETES_VERSION }}/bin/linux/amd64/kubectl"
           chmod +x kubectl
           sudo mv kubectl /usr/local/bin/
-          
+
           # Install kubeval for manifest validation
           curl -L https://github.com/instrumenta/kubeval/releases/latest/download/kubeval-linux-amd64.tar.gz | tar xz
           sudo mv kubeval /usr/local/bin
@@ -141,34 +141,34 @@ jobs:
       - name: "🔍 Validate Kubernetes Manifests"
         run: |
           echo "🔍 Validating Kubernetes manifests..."
-          
+
           # Validate base resources
           echo "Validating base resources..."
           find k8s/base -name "*.yaml" -exec kubeval {} \;
-          
+
           # Validate platform services
           echo "Validating platform services..."
           find k8s/platform -name "*.yaml" -exec kubeval {} \;
-          
+
           # Skip ArgoCD manifests as they may have CRDs we don't have locally
           echo "✅ Kubernetes manifest validation complete"
 
       - name: "🎨 Kustomize Build Test"
         run: |
           echo "🎨 Testing Kustomize builds..."
-          
+
           # Test base kustomization
           kubectl kustomize k8s/base/ > /dev/null
           echo "✅ Base kustomization builds successfully"
-          
-          # Test platform kustomization  
+
+          # Test platform kustomization
           kubectl kustomize k8s/platform/ > /dev/null
           echo "✅ Platform kustomization builds successfully"
 
   # ===========================================
   # APPLICATION TESTING
   # ===========================================
-  
+
   applications:
     name: "📱 Application Testing"
     runs-on: ubuntu-latest
@@ -183,12 +183,12 @@ jobs:
       - name: "🧪 Test Application Helm Charts"
         run: |
           echo "🧪 Testing application Helm charts..."
-          
+
           for app_dir in k8s/apps/*/chart; do
             if [ -d "$app_dir" ]; then
               app_name=$(basename $(dirname "$app_dir"))
               echo "Testing $app_name..."
-              
+
               # Test with different values files
               for env in dev stage prod; do
                 values_file="k8s/apps/$app_name/values/$env.yaml"
@@ -205,22 +205,22 @@ jobs:
       - name: "📋 Validate Apps Configuration"
         run: |
           echo "📋 Validating apps.yaml configuration..."
-          
+
           # Basic YAML syntax validation already done in lint job
           # Here we can add more specific validation logic
-          
+
           # Validate that apps reference existing chart directories
           if command -v yq >/dev/null 2>&1; then
             echo "Validating app references..."
             # Additional validation with yq if available
           fi
-          
+
           echo "✅ Apps configuration validated"
 
   # ===========================================
   # SECURITY SCANNING
   # ===========================================
-  
+
   security:
     name: "🔒 Security Scanning"
     runs-on: ubuntu-latest
@@ -239,31 +239,31 @@ jobs:
       - name: "🔍 Container Image Security"
         run: |
           echo "🔍 Scanning container images referenced in manifests..."
-          
+
           # Extract image references from YAML files
           images=$(grep -r "image:" k8s/ --include="*.yaml" | grep -v "#" | sed 's/.*image: *//g' | sort | uniq)
-          
+
           echo "Found images to scan:"
           echo "$images"
-          
+
           # Note: In a real scenario, you'd use tools like Trivy or Snyk here
           echo "✅ Image security scan completed (placeholder)"
 
       - name: "📊 Dependency Check"
         run: |
           echo "📊 Checking for known vulnerabilities in dependencies..."
-          
+
           # Check if any requirements files exist
           if find . -name "requirements.txt" -o -name "package.json" -o -name "go.mod" | grep -q .; then
             echo "Found dependency files - would scan with appropriate tools"
           fi
-          
+
           echo "✅ Dependency check completed"
 
   # ===========================================
   # INTEGRATION TESTS
   # ===========================================
-  
+
   integration:
     name: "🔗 Integration Tests"
     runs-on: ubuntu-latest
@@ -275,26 +275,26 @@ jobs:
       - name: "🏗️ Setup Test Environment"
         run: |
           echo "🏗️ Setting up test environment..."
-          
+
           # Setup k3d for integration testing
           curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-          
+
           echo "✅ Test environment ready"
 
       - name: "⚡ Quick Integration Test"
         run: |
           echo "⚡ Running quick integration tests..."
-          
+
           # Test Makefile targets
           if make help > /dev/null 2>&1; then
             echo "✅ Makefile help works"
           fi
-          
+
           # Test script execution (dry run)
           if ./scripts/new-app.sh --help > /dev/null 2>&1; then
             echo "✅ new-app.sh script is executable"
           fi
-          
+
           echo "✅ Quick integration tests passed"
 
       - name: "📈 Generate Test Report"
@@ -308,13 +308,13 @@ jobs:
           echo "- Applications: ✅ Passed" >> test-report.md
           echo "- Security: ✅ Passed" >> test-report.md
           echo "- Integration: ✅ Passed" >> test-report.md
-          
+
           cat test-report.md
 
   # ===========================================
   # BUILD SUMMARY
   # ===========================================
-  
+
   summary:
     name: "📋 Build Summary"
     runs-on: ubuntu-latest
@@ -332,7 +332,7 @@ jobs:
           echo "✅ Security: ${{ needs.security.result }}"
           echo "✅ Integration: ${{ needs.integration.result }}"
           echo ""
-          
+
           if [[ "${{ needs.lint.result }}" == "success" && \
                 "${{ needs.terraform.result }}" == "success" && \
                 "${{ needs.kubernetes.result }}" == "success" && \

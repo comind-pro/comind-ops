@@ -24,42 +24,6 @@ terraform {
   }
 }
 
-# Variables
-variable "cluster_name" {
-  description = "Name of the k3d cluster"
-  type        = string
-  default     = "comind-ops-dev"
-}
-
-variable "cluster_port" {
-  description = "Port to expose the cluster API"
-  type        = number
-  default     = 6443
-}
-
-variable "ingress_http_port" {
-  description = "HTTP port for ingress"
-  type        = number
-  default     = 8080
-}
-
-variable "ingress_https_port" {
-  description = "HTTPS port for ingress"
-  type        = number
-  default     = 8443
-}
-
-variable "registry_port" {
-  description = "Port for local docker registry"
-  type        = number
-  default     = 5000
-}
-
-variable "environment" {
-  description = "Environment name (dev, stage, prod)"
-  type        = string
-  default     = "dev"
-}
 
 # Providers
 provider "docker" {}
@@ -138,14 +102,14 @@ provider "helm" {
 # Create namespaces
 resource "kubernetes_namespace" "platform_namespaces" {
   for_each = toset(["platform-dev", "platform-stage", "platform-prod", "argocd", "sealed-secrets", "metallb-system"])
-  
+
   metadata {
     name = each.key
     labels = {
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
-  
+
   depends_on = [null_resource.kubeconfig]
 }
 
@@ -173,7 +137,7 @@ resource "kubernetes_manifest" "metallb_ippool" {
       addresses = ["172.18.255.200-172.18.255.250"]
     }
   }
-  
+
   depends_on = [helm_release.metallb]
 }
 
@@ -190,7 +154,7 @@ resource "kubernetes_manifest" "metallb_l2advertisement" {
       ipAddressPools = ["default-pool"]
     }
   }
-  
+
   depends_on = [helm_release.metallb]
 }
 
@@ -201,7 +165,7 @@ resource "helm_release" "ingress_nginx" {
   chart      = "ingress-nginx"
   version    = "4.8.3"
   namespace  = "ingress-nginx"
-  
+
   create_namespace = true
 
   values = [
@@ -217,7 +181,7 @@ resource "helm_release" "ingress_nginx" {
           default = true
         }
         config = {
-          use-forwarded-headers = "true"
+          use-forwarded-headers      = "true"
           compute-full-forwarded-for = "true"
         }
       }
@@ -260,7 +224,7 @@ resource "helm_release" "argocd" {
       global = {
         domain = "argocd.${var.environment}.127.0.0.1.nip.io"
       }
-      
+
       configs = {
         params = {
           "server.insecure" = true
@@ -269,13 +233,13 @@ resource "helm_release" "argocd" {
           "application.instanceLabelKey" = "argocd.argoproj.io/instance"
         }
       }
-      
+
       server = {
         ingress = {
-          enabled = true
+          enabled          = true
           ingressClassName = "nginx"
           annotations = {
-            "nginx.ingress.kubernetes.io/ssl-redirect" = "false"
+            "nginx.ingress.kubernetes.io/ssl-redirect"     = "false"
             "nginx.ingress.kubernetes.io/backend-protocol" = "HTTP"
           }
           hosts = [
@@ -283,7 +247,7 @@ resource "helm_release" "argocd" {
               host = "argocd.${var.environment}.127.0.0.1.nip.io"
               paths = [
                 {
-                  path = "/"
+                  path     = "/"
                   pathType = "Prefix"
                 }
               ]
@@ -319,7 +283,7 @@ resource "null_resource" "wait_for_argocd" {
 # Data sources for outputs
 data "external" "argocd_password" {
   depends_on = [null_resource.wait_for_argocd]
-  
+
   program = ["bash", "-c", <<-EOT
     password=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d 2>/dev/null || echo "admin")
     echo "{\"password\": \"$password\"}"
@@ -327,50 +291,3 @@ data "external" "argocd_password" {
   ]
 }
 
-# Outputs
-output "cluster_name" {
-  description = "Name of the k3d cluster"
-  value       = var.cluster_name
-}
-
-output "cluster_context" {
-  description = "Kubernetes context name"
-  value       = "k3d-${var.cluster_name}"
-}
-
-output "cluster_endpoint" {
-  description = "Kubernetes API server endpoint"
-  value       = "https://0.0.0.0:${var.cluster_port}"
-}
-
-output "ingress_endpoints" {
-  description = "Ingress controller endpoints"
-  value = {
-    http  = "http://127.0.0.1:${var.ingress_http_port}"
-    https = "https://127.0.0.1:${var.ingress_https_port}"
-  }
-}
-
-output "argocd_endpoint" {
-  description = "ArgoCD web UI endpoint"
-  value       = "http://argocd.${var.environment}.127.0.0.1.nip.io:${var.ingress_http_port}"
-}
-
-output "argocd_credentials" {
-  description = "ArgoCD admin credentials"
-  value = {
-    username = "admin"
-    password = data.external.argocd_password.result.password
-  }
-  sensitive = true
-}
-
-output "registry_endpoint" {
-  description = "Local docker registry endpoint"
-  value       = "localhost:${var.registry_port}"
-}
-
-output "namespaces_created" {
-  description = "List of namespaces created"
-  value       = keys(kubernetes_namespace.platform_namespaces)
-}

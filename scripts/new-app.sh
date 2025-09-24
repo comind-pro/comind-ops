@@ -4,6 +4,36 @@ set -euo pipefail
 # Comind-Ops Platform - New Application Scaffolding Script
 # Usage: ./scripts/new-app.sh <app-name> [options]
 
+# Define print_usage function first
+print_usage() {
+    cat << EOF
+Usage: $0 <app-name> [options]
+
+Options:
+    --team TEAM              Team responsible for the app (default: platform)
+    --description DESC       Application description
+    --port PORT              Service port (default: 8080)
+    --sync-wave WAVE         ArgoCD sync wave (default: 10)
+    --language LANG          Application language (generic|node|python|go|java)
+    --with-database          Include database configuration
+    --with-cache             Include Redis cache configuration  
+    --with-queue             Include queue (ElasticMQ) configuration
+    --with-terraform         Generate Terraform infrastructure configuration
+    --help                   Show this help message
+
+Examples:
+    $0 my-api --team backend --port 3000 --with-database --with-terraform
+    $0 my-frontend --team frontend --language node --port 3000
+    $0 my-worker --team backend --with-queue --sync-wave 20 --with-terraform
+EOF
+}
+
+# Check if app name provided
+if [[ $# -eq 0 ]] || [[ "$1" == "--help" ]] || [[ "$1" == "-h" ]]; then
+    print_usage
+    exit 0
+fi
+
 APP_NAME="$1"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"

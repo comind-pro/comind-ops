@@ -11,17 +11,17 @@ configs:
   params:
     # Enable insecure mode for local development
     server.insecure: true
-    
+
     # Enable application in any namespace
     application.namespaces: "*"
-    
+
     # Enable web-based terminal
     exec.enabled: true
-    
+
     # Repository server configuration
     repo.server: true
-    
-    # Controller configuration  
+
+    # Controller configuration
     controller.diff.server.side: true
     controller.resource.customizations: |
       argoproj.io/Application:
@@ -33,16 +33,16 @@ configs:
   cm:
     # Application instance label key
     application.instanceLabelKey: argocd.argoproj.io/instance
-    
+
     # Server configuration
     url: http://argocd.dev.127.0.0.1.nip.io:8080
-    
+
     # Repository configuration
     repositories: |
       - url: https://github.com/your-org/comind-ops-cloud-setup
         name: comind-ops-platform
         type: git
-    
+
     # Resource customizations
     resource.customizations: |
       argoproj.io/Application:
@@ -64,7 +64,7 @@ configs:
       p, role:admin, gpgkeys, *, *, allow
       p, role:admin, logs, *, *, allow
       p, role:admin, exec, *, *, allow
-      
+
       # Developer policy
       p, role:developer, applications, get, */*, allow
       p, role:developer, applications, sync, */*, allow
@@ -72,13 +72,13 @@ configs:
       p, role:developer, applications, action/*, */*, allow
       p, role:developer, logs, get, */*, allow
       p, role:developer, exec, create, */*, allow
-      
+
       # ReadOnly policy (default)
       p, role:readonly, applications, get, */*, allow
       p, role:readonly, repositories, get, *, allow
       p, role:readonly, clusters, get, *, allow
       p, role:readonly, logs, get, */*, allow
-      
+
       # Group bindings (customize these for your organization)
       g, argocd-admins, role:admin
       g, platform-developers, role:developer
@@ -93,13 +93,13 @@ configs:
 server:
   # Replica count
   replicas: 1
-  
+
   # Autoscaling
   autoscaling:
     enabled: false
     minReplicas: 1
     maxReplicas: 3
-  
+
   # Resources
   resources:
     requests:
@@ -108,7 +108,7 @@ server:
     limits:
       memory: "512Mi"
       cpu: "500m"
-  
+
   # Ingress configuration
   ingress:
     enabled: true
@@ -123,14 +123,14 @@ server:
         client_body_timeout 60;
         client_header_timeout 60;
         client_max_body_size 10m;
-    
+
     # TLS configuration (disabled for local development)
     tls: false
-  
+
   # Service configuration
   service:
     type: ClusterIP
-  
+
   # Additional configuration
   config:
     url: http://argocd.dev.127.0.0.1.nip.io:8080
@@ -139,7 +139,7 @@ server:
 # Repository server configuration
 repoServer:
   replicas: 1
-  
+
   resources:
     requests:
       memory: "256Mi"
@@ -147,16 +147,16 @@ repoServer:
     limits:
       memory: "512Mi"
       cpu: "500m"
-  
+
   # Mount repository credentials
   volumes:
   - name: custom-tools
     emptyDir: {}
-  
+
   volumeMounts:
   - mountPath: /custom-tools
     name: custom-tools
-  
+
   # Environment variables for repository access
   env:
   - name: HELM_CACHE_HOME
@@ -169,7 +169,7 @@ repoServer:
 # Controller configuration
 controller:
   replicas: 1
-  
+
   resources:
     requests:
       memory: "512Mi"
@@ -177,13 +177,13 @@ controller:
     limits:
       memory: "1Gi"
       cpu: "500m"
-  
+
   # Metrics
   metrics:
     enabled: true
     serviceMonitor:
       enabled: false
-  
+
   # Application controller configuration
   env:
   - name: ARGOCD_CONTROLLER_REPLICAS
@@ -192,7 +192,7 @@ controller:
 # Dex (OIDC) configuration
 dex:
   enabled: true
-  
+
   resources:
     requests:
       memory: "128Mi"
@@ -204,15 +204,15 @@ dex:
 # ApplicationSet controller
 applicationSet:
   enabled: true
-  
+
   resources:
     requests:
       memory: "128Mi"
-      cpu: "100m"  
+      cpu: "100m"
     limits:
       memory: "256Mi"
       cpu: "200m"
-  
+
   # Metrics
   metrics:
     enabled: true
@@ -226,7 +226,7 @@ notifications:
 # Redis configuration
 redis:
   enabled: true
-  
+
   resources:
     requests:
       memory: "128Mi"
@@ -263,10 +263,10 @@ extraObjects:
   data:
     # Enable application in any namespace
     application.namespaces: "*"
-    
+
     # Enable cascaded deletion
     controller.deletion.mode: "background"
-    
+
     # Application controller settings
     controller.status.processors: "20"
     controller.operation.processors: "10"

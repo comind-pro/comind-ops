@@ -12,7 +12,7 @@ terraform {
 # ServiceMonitor for Prometheus
 resource "kubernetes_manifest" "service_monitor" {
   count = var.monitoring_config.prometheus_enabled ? 1 : 0
-  
+
   manifest = {
     apiVersion = "monitoring.coreos.com/v1"
     kind       = "ServiceMonitor"
@@ -27,7 +27,7 @@ resource "kubernetes_manifest" "service_monitor" {
         }
       }
       endpoints = [{
-        port = "metrics"
+        port     = "metrics"
         interval = "30s"
       }]
     }

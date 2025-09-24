@@ -10,7 +10,7 @@ global:
 # Application scaling
 replicaCount: 1
 
-# Container image configuration  
+# Container image configuration
 image:
   repository: nginx
   pullPolicy: Always
@@ -80,7 +80,7 @@ platformServices:
     pool:
       min: 1
       max: 5
-  
+
   queue:
     enabled: true
     host: elasticmq.platform-dev.svc.cluster.local
@@ -89,7 +89,7 @@ platformServices:
     queues:
       - default
       - notifications
-  
+
   storage:
     enabled: true
     endpoint: minio.platform-dev.svc.cluster.local:9000
@@ -101,10 +101,10 @@ platformServices:
   cache:
     enabled: false
 
-# Monitoring configuration
+# Monitoring configuration (ServiceMonitor requires Prometheus Operator)
 monitoring:
   serviceMonitor:
-    enabled: true
+    enabled: false
     interval: 30s
     scrapeTimeout: 10s
 

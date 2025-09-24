@@ -8,9 +8,9 @@ metadata:
     # ArgoCD sync wave for ordered deployment
     argocd.argoproj.io/sync-wave: "10"
 spec:
-  {{- if not .Values.autoscaling.enabled }}
+{{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
-  {{- end }}
+{{- end }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -41,7 +41,7 @@ spec:
       serviceAccountName: {{ include "sample-app.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      
+
       {{- if .Values.initContainers }}
       initContainers:
         {{- range .Values.initContainers }}
@@ -67,7 +67,7 @@ spec:
               - ALL
         {{- end }}
       {{- end }}
-      
+
       containers:
         - name: {{ .Chart.Name }}
           securityContext:
@@ -83,25 +83,25 @@ spec:
               containerPort: {{ .targetPort }}
               protocol: TCP
             {{- end }}
-          
+
           {{- if .Values.livenessProbe }}
           livenessProbe:
             {{- toYaml .Values.livenessProbe | nindent 12 }}
           {{- end }}
-          
+
           {{- if .Values.readinessProbe }}
           readinessProbe:
             {{- toYaml .Values.readinessProbe | nindent 12 }}
           {{- end }}
-          
+
           {{- if .Values.startupProbe }}
           startupProbe:
             {{- toYaml .Values.startupProbe | nindent 12 }}
           {{- end }}
-          
+
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-          
+
           # Environment variables from values
           env:
             # Standard environment variables
@@ -109,7 +109,7 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
-            
+
             # Global configuration
             - name: NAMESPACE
               valueFrom:
@@ -127,7 +127,7 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: spec.nodeName
-                  
+
             # Platform service endpoints
             {{- if .Values.platformServices.database.enabled }}
             - name: DATABASE_HOST
@@ -137,7 +137,7 @@ spec:
             - name: DATABASE_NAME
               value: {{ .Values.platformServices.database.name | quote }}
             {{- end }}
-            
+
             {{- if .Values.platformServices.queue.enabled }}
             - name: QUEUE_HOST
               value: {{ .Values.platformServices.queue.host | quote }}
@@ -146,14 +146,14 @@ spec:
             - name: QUEUE_REGION
               value: {{ .Values.platformServices.queue.region | quote }}
             {{- end }}
-            
+
             {{- if .Values.platformServices.storage.enabled }}
             - name: STORAGE_ENDPOINT
               value: {{ .Values.platformServices.storage.endpoint | quote }}
             - name: STORAGE_SECURE
               value: {{ .Values.platformServices.storage.secure | quote }}
             {{- end }}
-            
+
             # Secret environment variables
             {{- range $key, $value := .Values.secretEnv }}
             {{- if $value }}
@@ -164,7 +164,7 @@ spec:
                   key: {{ $key }}
             {{- end }}
             {{- end }}
-          
+
           # Volume mounts
           {{- if .Values.volumeMounts }}
           volumeMounts:
@@ -178,7 +178,7 @@ spec:
               subPath: nginx.conf
               readOnly: true
           {{- end }}
-      
+
       {{- if .Values.volumes }}
       volumes:
         {{- toYaml .Values.volumes | nindent 8 }}
@@ -193,7 +193,7 @@ spec:
             - key: nginx.conf
               path: nginx.conf
       {{- end }}
-      
+
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -206,6 +206,6 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      
+
       # Termination grace period
       terminationGracePeriodSeconds: 30

@@ -36,19 +36,19 @@ spec:
             - -c
             - |
               set -e
-              
+
               # Backup configuration
               BACKUP_NAME="postgres-backup-$(date +%Y%m%d-%H%M%S)"
               BACKUP_PATH="/backups/${BACKUP_NAME}"
               RETENTION_DAYS=${RETENTION_DAYS:-7}
-              
+
               echo "Starting PostgreSQL backup: $BACKUP_NAME"
               echo "Timestamp: $(date)"
               echo "Retention: $RETENTION_DAYS days"
-              
+
               # Create backup directory
               mkdir -p "$BACKUP_PATH"
-              
+
               # Perform database backup
               echo "Creating database dump..."
               pg_dumpall \
@@ -59,30 +59,30 @@ spec:
                 --if-exists \
                 --no-password \
                 > "$BACKUP_PATH/dump.sql"
-              
+
               # Create backup metadata
               cat > "$BACKUP_PATH/metadata.json" << EOF
               {
                 "timestamp": "$(date -Iseconds)",
                 "hostname": "$POSTGRES_HOST",
-                "port": "$POSTGRES_PORT", 
+                "port": "$POSTGRES_PORT",
                 "user": "$POSTGRES_USER",
                 "backup_type": "full",
                 "compression": "gzip",
                 "size_mb": "$(du -m "$BACKUP_PATH/dump.sql" | cut -f1)"
               }
               EOF
-              
+
               # Compress backup
               echo "Compressing backup..."
               gzip "$BACKUP_PATH/dump.sql"
-              
+
               # Update metadata with compressed size
               COMPRESSED_SIZE=$(du -m "$BACKUP_PATH/dump.sql.gz" | cut -f1)
               sed -i "s/\"size_mb\": \"[0-9]*\"/\"size_mb\": \"$COMPRESSED_SIZE\"/" "$BACKUP_PATH/metadata.json"
-              
+
               echo "Backup completed: $BACKUP_PATH/dump.sql.gz ($COMPRESSED_SIZE MB)"
-              
+
               # Upload to MinIO (if configured)
               if [ -n "$MINIO_ENDPOINT" ]; then
                 echo "Uploading to MinIO..."
@@ -90,17 +90,17 @@ spec:
                 mc cp -r "$BACKUP_PATH" "backup/$MINIO_BUCKET/postgres/"
                 echo "Upload completed"
               fi
-              
+
               # Clean up old backups (local)
               echo "Cleaning up backups older than $RETENTION_DAYS days..."
               find /backups -name "postgres-backup-*" -type d -mtime +$RETENTION_DAYS -exec rm -rf {} \; || true
-              
+
               # Clean up old backups (MinIO)
               if [ -n "$MINIO_ENDPOINT" ]; then
                 echo "Cleaning up old MinIO backups..."
                 mc find "backup/$MINIO_BUCKET/postgres/" --name "postgres-backup-*" --older-than "${RETENTION_DAYS}d" --exec "mc rm -r {}"
               fi
-              
+
               echo "PostgreSQL backup completed successfully at $(date)"
             env:
             - name: POSTGRES_HOST

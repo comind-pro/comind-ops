@@ -7,6 +7,9 @@ metadata:
   labels:
     name: monitoring
     app.kubernetes.io/managed-by: "kubernetes"
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
 ---
 apiVersion: v1
 kind: Namespace
@@ -23,4 +26,7 @@ metadata:
   labels:
     name: backup-system
     app.kubernetes.io/managed-by: "kubernetes"
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: baseline
+    pod-security.kubernetes.io/warn: baseline
 

@@ -12,13 +12,13 @@ kind: ClusterRole
 metadata:
   name: backup-operator
 rules:
-- apiGroups: [""]
+  - apiGroups: [""]
   resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "persistentvolumes"]
   verbs: ["get", "list", "watch"]
-- apiGroups: ["apps"]
+  - apiGroups: ["apps"]
   resources: ["deployments", "statefulsets", "daemonsets"]
   verbs: ["get", "list", "watch"]
-- apiGroups: [""]
+  - apiGroups: [""]
   resources: ["secrets", "configmaps"]
   verbs: ["get", "list"]
 ---
@@ -62,16 +62,16 @@ metadata:
   name: app-deployer
   namespace: platform-dev
 rules:
-- apiGroups: [""]
+  - apiGroups: [""]
   resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
   verbs: ["*"]
-- apiGroups: ["apps"]
+  - apiGroups: ["apps"]
   resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
   verbs: ["*"]
-- apiGroups: ["extensions", "networking.k8s.io"]
+  - apiGroups: ["extensions", "networking.k8s.io"]
   resources: ["ingresses"]
   verbs: ["*"]
-- apiGroups: ["batch"]
+  - apiGroups: ["batch"]
   resources: ["jobs", "cronjobs"]
   verbs: ["*"]
 ---
@@ -81,16 +81,16 @@ metadata:
   name: app-deployer
   namespace: platform-stage
 rules:
-- apiGroups: [""]
+  - apiGroups: [""]
   resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
   verbs: ["*"]
-- apiGroups: ["apps"]
+  - apiGroups: ["apps"]
   resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
   verbs: ["*"]
-- apiGroups: ["extensions", "networking.k8s.io"]
+  - apiGroups: ["extensions", "networking.k8s.io"]
   resources: ["ingresses"]
   verbs: ["*"]
-- apiGroups: ["batch"]
+  - apiGroups: ["batch"]
   resources: ["jobs", "cronjobs"]
   verbs: ["*"]
 ---
@@ -100,16 +100,16 @@ metadata:
   name: app-deployer
   namespace: platform-prod
 rules:
-- apiGroups: [""]
+  - apiGroups: [""]
   resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "configmaps", "secrets"]
   verbs: ["*"]
-- apiGroups: ["apps"]
+  - apiGroups: ["apps"]
   resources: ["deployments", "statefulsets", "daemonsets", "replicasets"]
   verbs: ["*"]
-- apiGroups: ["extensions", "networking.k8s.io"]
+  - apiGroups: ["extensions", "networking.k8s.io"]
   resources: ["ingresses"]
   verbs: ["*"]
-- apiGroups: ["batch"]
+  - apiGroups: ["batch"]
   resources: ["jobs", "cronjobs"]
   verbs: ["*"]
 ---

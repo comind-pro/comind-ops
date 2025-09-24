@@ -26,7 +26,7 @@ output "database" {
     engine_version    = module.database[0].engine_version
     multi_az          = module.database[0].multi_az
     backup_retention  = module.database[0].backup_retention_period
-  } : {
+    } : {
     enabled = false
   }
   sensitive = true
@@ -36,18 +36,18 @@ output "database" {
 output "storage" {
   description = "Storage configuration and bucket details"
   value = var.storage.enabled ? {
-    enabled       = true
-    endpoint      = module.storage[0].endpoint
-    access_key    = module.storage[0].access_key
-    secret_key    = module.storage[0].secret_key
-    bucket_names  = module.storage[0].bucket_names
-    bucket_urls   = module.storage[0].bucket_urls
-    console_url   = module.storage[0].console_url
-    region        = module.storage[0].region
-    service_name  = module.storage[0].service_name
-    service_port  = module.storage[0].service_port
-    secure        = module.storage[0].secure_connection
-  } : {
+    enabled      = true
+    endpoint     = module.storage[0].endpoint
+    access_key   = module.storage[0].access_key
+    secret_key   = module.storage[0].secret_key
+    bucket_names = module.storage[0].bucket_names
+    bucket_urls  = module.storage[0].bucket_urls
+    console_url  = module.storage[0].console_url
+    region       = module.storage[0].region
+    service_name = module.storage[0].service_name
+    service_port = module.storage[0].service_port
+    secure       = module.storage[0].secure_connection
+    } : {
     enabled = false
   }
   sensitive = true
@@ -61,7 +61,7 @@ output "queue" {
     endpoint   = module.queue[0].endpoint
     queue_urls = module.queue[0].queue_urls
     queues     = [for q in var.queue.queues : q.name]
-  } : {
+    } : {
     enabled = false
   }
 }
@@ -74,7 +74,7 @@ output "cache" {
     endpoint   = module.cache[0].endpoint
     port       = module.cache[0].port
     auth_token = module.cache[0].auth_token
-  } : {
+    } : {
     enabled = false
   }
   sensitive = true
@@ -100,7 +100,7 @@ output "monitoring" {
     service_monitor_name = module.monitoring[0].service_monitor_name
     grafana_enabled      = var.monitoring.grafana_enabled
     alerting_enabled     = var.monitoring.alerting_enabled
-  } : {
+    } : {
     enabled = false
   }
 }
@@ -109,7 +109,7 @@ output "monitoring" {
 output "security" {
   description = "Security configuration"
   value = {
-    service_account_name  = module.security.service_account_name
+    service_account_name = module.security.service_account_name
     rbac_enabled         = var.security.create_rbac
     network_policies     = var.security.namespace_isolation
     namespace_isolation  = var.security.namespace_isolation
@@ -121,11 +121,11 @@ output "backup" {
   description = "Backup configuration"
   value = var.backup.enabled ? {
     enabled                 = true
-    schedule               = module.backup[0].backup_schedule
-    retention_days         = var.backup.retention_days
+    schedule                = module.backup[0].backup_schedule
+    retention_days          = var.backup.retention_days
     database_backup_enabled = var.backup.database_backup_enabled
     storage_backup_enabled  = var.backup.storage_backup_enabled
-  } : {
+    } : {
     enabled = false
   }
 }
@@ -183,12 +183,12 @@ output "service_endpoints" {
 output "enabled_features" {
   description = "Summary of enabled features for this application"
   value = {
-    database   = var.database.enabled
-    storage    = var.storage.enabled
-    queue      = var.queue.enabled
-    cache      = var.cache.enabled
-    monitoring = var.monitoring.enabled
-    backup     = var.backup.enabled
+    database    = var.database.enabled
+    storage     = var.storage.enabled
+    queue       = var.queue.enabled
+    cache       = var.cache.enabled
+    monitoring  = var.monitoring.enabled
+    backup      = var.backup.enabled
     autoscaling = var.advanced.enable_autoscaling
     multi_az    = var.advanced.multi_az_deployment
   }

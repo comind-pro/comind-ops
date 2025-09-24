@@ -11,7 +11,7 @@ data:
   {{ $key }}: |
 {{ $value | indent 4 }}
   {{- end }}
-  
+
   # Platform service configuration
   platform-services.yaml: |
     database:
@@ -22,7 +22,7 @@ data:
       {{- toYaml .Values.platformServices.storage | nindent 6 }}
     cache:
       {{- toYaml .Values.platformServices.cache | nindent 6 }}
-  
+
   # Application metadata
   app-metadata.json: |
     {
@@ -50,16 +50,16 @@ data:
         "networkPolicy": {{ .Values.networkPolicy.enabled }}
       }
     }
-    
+
   # Health check endpoints
   health-endpoints.txt: |
     # Health check endpoints for monitoring
     /health     - Liveness probe endpoint
-    /ready      - Readiness probe endpoint  
+    /ready      - Readiness probe endpoint
     /startup    - Startup probe endpoint
     /metrics    - Prometheus metrics endpoint
     /info       - Application information
-    
+
   # Queue configuration
   {{- if .Values.platformServices.queue.enabled }}
   queue-config.json: |
@@ -75,8 +75,8 @@ data:
       }
     }
   {{- end }}
-  
-  # Storage bucket configuration  
+
+  # Storage bucket configuration
   {{- if .Values.platformServices.storage.enabled }}
   storage-config.json: |
     {

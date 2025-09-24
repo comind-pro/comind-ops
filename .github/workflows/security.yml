@@ -18,7 +18,7 @@ jobs:
   # ===========================================
   # SECRET SCANNING
   # ===========================================
-  
+
   secrets:
     name: "🔐 Secret Scanning"
     runs-on: ubuntu-latest
@@ -60,7 +60,7 @@ jobs:
   # ===========================================
   # VULNERABILITY SCANNING
   # ===========================================
-  
+
   vulnerabilities:
     name: "🛡️ Vulnerability Scanning"
     runs-on: ubuntu-latest
@@ -85,13 +85,13 @@ jobs:
         if: github.event_name == 'push' || github.event_name == 'schedule'
         run: |
           echo "🐳 Scanning container images referenced in the project..."
-          
+
           # Extract image references from YAML files
           images=$(grep -r "image:" k8s/ --include="*.yaml" | grep -v "#" | sed 's/.*image: *//g' | sed 's/["'"'"']//g' | sort | uniq)
-          
+
           echo "Found images to scan:"
           echo "$images"
-          
+
           # Scan each image with Trivy
           while IFS= read -r image; do
             if [ ! -z "$image" ] && [[ "$image" != *"$"* ]]; then
@@ -105,7 +105,7 @@ jobs:
   # ===========================================
   # CODE QUALITY SECURITY
   # ===========================================
-  
+
   code-quality:
     name: "📝 Code Quality Security"
     runs-on: ubuntu-latest
@@ -128,9 +128,9 @@ jobs:
       - name: "🐚 ShellCheck for Scripts"
         run: |
           echo "🐚 Running ShellCheck on shell scripts..."
-          
+
           find . -name "*.sh" -type f -exec shellcheck {} \; > shellcheck-results.txt 2>&1 || true
-          
+
           if [ -s shellcheck-results.txt ]; then
             echo "⚠️ ShellCheck findings:"
             cat shellcheck-results.txt
@@ -141,14 +141,14 @@ jobs:
       - name: "📋 YAML Security Validation"
         run: |
           echo "📋 Validating YAML files for security issues..."
-          
+
           # Check for potential security issues in Kubernetes manifests
           find k8s/ -name "*.yaml" -exec echo "Checking {}" \; -exec grep -l "privileged.*true\|hostNetwork.*true\|hostPID.*true\|runAsUser.*0" {} \; || echo "No obvious security issues found"
 
   # ===========================================
   # INFRASTRUCTURE SECURITY
   # ===========================================
-  
+
   infrastructure:
     name: "🏗️ Infrastructure Security"
     runs-on: ubuntu-latest
@@ -164,7 +164,7 @@ jobs:
           output_format: sarif
           output_file_path: checkov-results.sarif
           quiet: true
-          
+
       - name: "📊 Upload Checkov Results"
         uses: github/codeql-action/upload-sarif@v2
         with:
@@ -180,18 +180,18 @@ jobs:
       - name: "⚙️ Kubernetes Security with Polaris"
         run: |
           echo "⚙️ Running Kubernetes security validation..."
-          
+
           # Install Polaris
           curl -L https://github.com/FairwindsOps/polaris/releases/latest/download/polaris_linux_amd64.tar.gz | tar xz
           chmod +x polaris
-          
+
           # Validate Kubernetes manifests
           find k8s/ -name "*.yaml" -exec ./polaris validate --audit-path {} \; || echo "Polaris validation completed"
 
   # ===========================================
   # DEPENDENCY SECURITY
   # ===========================================
-  
+
   dependencies:
     name: "📦 Dependency Security"
     runs-on: ubuntu-latest
@@ -206,7 +206,7 @@ jobs:
       - name: "📋 License Compliance Check"
         run: |
           echo "📋 Checking license compliance..."
-          
+
           # Look for common dependency files
           if find . -name "package.json" -o -name "requirements.txt" -o -name "go.mod" -o -name "Cargo.toml" | grep -q .; then
             echo "Found dependency files - would run license scanning"
@@ -215,30 +215,30 @@ jobs:
             # - WhiteSource/Mend
             # - Black Duck
           fi
-          
+
           echo "✅ License compliance check completed"
 
       - name: "🔒 Container Base Image Security"
         run: |
           echo "🔒 Scanning container base images for vulnerabilities..."
-          
+
           # Look for Dockerfiles
           find . -name "Dockerfile*" -type f | while read -r dockerfile; do
             echo "Analyzing $dockerfile"
-            
+
             # Extract FROM instructions
             base_images=$(grep "^FROM" "$dockerfile" | awk '{print $2}' | grep -v "^--" || true)
-            
+
             echo "Base images found:"
             echo "$base_images"
-            
+
             # In a real scenario, scan these base images with Trivy or similar
           done
 
   # ===========================================
   # COMPLIANCE & POLICY
   # ===========================================
-  
+
   compliance:
     name: "📋 Compliance & Policy"
     runs-on: ubuntu-latest
@@ -249,30 +249,30 @@ jobs:
       - name: "📋 Open Policy Agent (OPA) Validation"
         run: |
           echo "📋 Running OPA policy validation..."
-          
+
           # Install OPA
           curl -L -o opa https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static
           chmod +x opa
-          
+
           # Run policy validation if policies exist
           if [ -d "policies/" ]; then
             echo "Validating against custom policies..."
             ./opa test policies/
           fi
-          
+
           echo "✅ Policy validation completed"
 
       - name: "🏛️ Compliance Framework Check"
         run: |
           echo "🏛️ Checking compliance framework adherence..."
-          
+
           # Check for compliance markers and configurations
           # This could include:
           # - SOC 2 compliance markers
           # - GDPR data handling annotations
           # - HIPAA security configurations
           # - PCI DSS requirements
-          
+
           echo "Compliance frameworks to validate:"
           echo "- Security configurations ✅"
           echo "- Data protection measures ✅"
@@ -282,7 +282,7 @@ jobs:
   # ===========================================
   # SECURITY REPORTING
   # ===========================================
-  
+
   reporting:
     name: "📊 Security Reporting"
     runs-on: ubuntu-latest
@@ -306,7 +306,7 @@ jobs:
           echo "- Dependency Security: ${{ needs.dependencies.result }}"
           echo "- Compliance Check: ${{ needs.compliance.result }}"
           echo ""
-          
+
           # Determine overall security status
           if [[ "${{ needs.secrets.result }}" == "success" && \
                 "${{ needs.vulnerabilities.result }}" == "success" && \

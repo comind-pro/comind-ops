@@ -1,4 +1,4 @@
-# Staging environment configuration  
+# Staging environment configuration
 # Production-like setup for pre-production testing
 
 # Global configuration
@@ -88,7 +88,7 @@ platformServices:
     pool:
       min: 5
       max: 20
-  
+
   queue:
     enabled: true
     host: elasticmq.platform-stage.svc.cluster.local
@@ -98,7 +98,7 @@ platformServices:
       - default
       - notifications
       - high-priority
-  
+
   storage:
     enabled: true
     endpoint: minio.platform-stage.svc.cluster.local:9000

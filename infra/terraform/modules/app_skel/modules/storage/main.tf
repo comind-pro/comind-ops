@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    digitalocean = {
+      source  = "digitalocean/digitalocean"
+      version = "~> 2.0"
+    }
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "~> 2.23"
@@ -43,25 +47,25 @@ resource "random_password" "minio_secret_key" {
 # Local MinIO deployment (k3d)
 resource "helm_release" "minio" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   name       = "${var.app_name}-minio"
   repository = "https://charts.min.io/"
   chart      = "minio"
   version    = "5.0.14"
   namespace  = var.kubernetes_namespace
-  
+
   values = [
     yamlencode({
       # Authentication
       rootUser     = random_password.minio_access_key[0].result
       rootPassword = random_password.minio_secret_key[0].result
-      
+
       # Storage
       persistence = {
         enabled = true
         size    = var.storage_config.local_storage_size
       }
-      
+
       # Resources
       resources = {
         requests = {
@@ -73,35 +77,35 @@ resource "helm_release" "minio" {
           cpu    = var.environment == "prod" ? "1000m" : var.environment == "stage" ? "500m" : "200m"
         }
       }
-      
+
       # High availability
       replicas = var.storage_config.local_replica_count
-      
+
       # Console (web UI)
       consoleService = {
         type = "ClusterIP"
       }
-      
+
       # API service
       service = {
         type = "ClusterIP"
         port = 9000
       }
-      
+
       # Security
       securityContext = {
-        enabled = true
-        runAsUser     = 1000
-        runAsGroup    = 1000
-        fsGroup       = 1000
+        enabled    = true
+        runAsUser  = 1000
+        runAsGroup = 1000
+        fsGroup    = 1000
       }
-      
+
       # Network policy
       networkPolicy = {
-        enabled = true
+        enabled       = true
         allowExternal = false
       }
-      
+
       # Metrics
       metrics = {
         serviceMonitor = {
@@ -115,14 +119,14 @@ resource "helm_release" "minio" {
 # AWS S3 buckets
 resource "aws_s3_bucket" "app_buckets" {
   count = var.cluster_type == "aws" ? length(var.storage_buckets) : 0
-  
+
   bucket = var.storage_buckets[count.index].name
   tags   = var.tags
 }
 
 resource "aws_s3_bucket_versioning" "app_buckets" {
   count = var.cluster_type == "aws" ? length(var.storage_buckets) : 0
-  
+
   bucket = aws_s3_bucket.app_buckets[count.index].id
   versioning_configuration {
     status = var.storage_buckets[count.index].config.versioning_enabled ? "Enabled" : "Disabled"
@@ -131,7 +135,7 @@ resource "aws_s3_bucket_versioning" "app_buckets" {
 
 resource "aws_s3_bucket_lifecycle_configuration" "app_buckets" {
   count = var.cluster_type == "aws" && var.storage_buckets[0].config.lifecycle_enabled ? length(var.storage_buckets) : 0
-  
+
   bucket = aws_s3_bucket.app_buckets[count.index].id
 
   rule {
@@ -150,7 +154,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "app_buckets" {
 
 resource "aws_s3_bucket_cors_configuration" "app_buckets" {
   count = var.cluster_type == "aws" && var.storage_buckets[0].config.cors_enabled ? length(var.storage_buckets) : 0
-  
+
   bucket = aws_s3_bucket.app_buckets[count.index].id
 
   cors_rule {
@@ -163,7 +167,7 @@ resource "aws_s3_bucket_cors_configuration" "app_buckets" {
 
 resource "aws_s3_bucket_public_access_block" "app_buckets" {
   count = var.cluster_type == "aws" ? length(var.storage_buckets) : 0
-  
+
   bucket = aws_s3_bucket.app_buckets[count.index].id
 
   block_public_acls       = !var.storage_buckets[count.index].config.public_read
@@ -175,23 +179,23 @@ resource "aws_s3_bucket_public_access_block" "app_buckets" {
 # DigitalOcean Spaces
 resource "digitalocean_spaces_bucket" "app_buckets" {
   count = var.cluster_type == "digitalocean" ? length(var.storage_buckets) : 0
-  
+
   name   = var.storage_buckets[count.index].name
   region = var.region
-  
+
   versioning {
     enabled = var.storage_buckets[count.index].config.versioning_enabled
   }
-  
+
   lifecycle_rule {
     id      = "lifecycle_rule"
     enabled = var.storage_buckets[count.index].config.lifecycle_enabled
-    
+
     expiration {
       days = var.storage_buckets[count.index].config.lifecycle_expiration
     }
   }
-  
+
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["GET", "HEAD", "PUT", "POST", "DELETE"]
@@ -203,17 +207,17 @@ resource "digitalocean_spaces_bucket" "app_buckets" {
 # Bucket initialization job (creates buckets in MinIO)
 resource "kubernetes_job" "bucket_init" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   metadata {
     name      = "${var.app_name}-bucket-init"
     namespace = var.kubernetes_namespace
     labels = {
-      "app.kubernetes.io/name"      = var.app_name
-      "app.kubernetes.io/component" = "storage-init"
+      "app.kubernetes.io/name"       = var.app_name
+      "app.kubernetes.io/component"  = "storage-init"
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
-  
+
   spec {
     template {
       metadata {
@@ -222,14 +226,14 @@ resource "kubernetes_job" "bucket_init" {
           "app.kubernetes.io/component" = "storage-init"
         }
       }
-      
+
       spec {
         restart_policy = "OnFailure"
-        
+
         container {
           name  = "bucket-init"
           image = "minio/mc:latest"
-          
+
           command = ["/bin/sh", "-c"]
           args = [
             <<-EOT
@@ -260,7 +264,7 @@ resource "kubernetes_job" "bucket_init" {
             echo "Storage initialization completed successfully"
             EOT
           ]
-          
+
           env {
             name  = "MINIO_ENDPOINT"
             value = "http://${var.app_name}-minio.${var.kubernetes_namespace}.svc.cluster.local:9000"
@@ -273,7 +277,7 @@ resource "kubernetes_job" "bucket_init" {
             name  = "MINIO_SECRET_KEY"
             value = random_password.minio_secret_key[0].result
           }
-          
+
           resources {
             requests = {
               memory = "64Mi"
@@ -287,11 +291,11 @@ resource "kubernetes_job" "bucket_init" {
         }
       }
     }
-    
-    backoff_limit = 3
+
+    backoff_limit              = 3
     ttl_seconds_after_finished = 3600
   }
-  
+
   depends_on = [helm_release.minio]
 }
 
@@ -339,21 +343,21 @@ resource "aws_iam_user_policy" "s3_policy" {
 locals {
   storage_endpoint = var.cluster_type == "local" ? (
     "${var.app_name}-minio.${var.kubernetes_namespace}.svc.cluster.local:9000"
-  ) : var.cluster_type == "aws" ? (
+    ) : var.cluster_type == "aws" ? (
     "s3.amazonaws.com"
-  ) : var.cluster_type == "digitalocean" ? (
+    ) : var.cluster_type == "digitalocean" ? (
     "${var.region}.digitaloceanspaces.com"
   ) : ""
-  
+
   access_key = var.cluster_type == "local" ? (
     length(random_password.minio_access_key) > 0 ? random_password.minio_access_key[0].result : ""
-  ) : var.cluster_type == "aws" ? (
+    ) : var.cluster_type == "aws" ? (
     length(aws_iam_access_key.s3_user) > 0 ? aws_iam_access_key.s3_user[0].id : ""
   ) : ""
-  
+
   secret_key = var.cluster_type == "local" ? (
     length(random_password.minio_secret_key) > 0 ? random_password.minio_secret_key[0].result : ""
-  ) : var.cluster_type == "aws" ? (
+    ) : var.cluster_type == "aws" ? (
     length(aws_iam_access_key.s3_user) > 0 ? aws_iam_access_key.s3_user[0].secret : ""
   ) : ""
 }

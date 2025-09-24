@@ -47,7 +47,7 @@ jobs:
   # ===========================================
   # TERRAFORM PLAN
   # ===========================================
-  
+
   plan:
     name: "📋 Terraform Plan"
     runs-on: ubuntu-latest
@@ -99,15 +99,15 @@ jobs:
             -var="cluster_type=local" \
             -var="environment=${{ env.TF_VAR_environment }}" \
             2>&1 | tee plan_output.txt
-          
+
           # Capture exit code
           PLAN_EXIT_CODE=${PIPESTATUS[0]}
           echo "plan_exit_code=$PLAN_EXIT_CODE" >> $GITHUB_OUTPUT
-          
+
           # Parse plan output for summary
           PLAN_SUMMARY=$(grep -E "(Plan:|No changes)" plan_output.txt || echo "Plan generated")
           echo "plan_summary=$PLAN_SUMMARY" >> $GITHUB_OUTPUT
-          
+
           exit $PLAN_EXIT_CODE
 
       - name: "📊 Upload Plan Artifact"
@@ -127,21 +127,21 @@ jobs:
           script: |
             const output = `
             ## 📋 Terraform Plan Results - ${{ matrix.name }}
-            
+
             **Status:** ${{ steps.plan.outcome == 'success' && '✅ Success' || '❌ Failed' }}
             **Exit Code:** ${{ steps.plan.outputs.plan_exit_code }}
             **Summary:** ${{ steps.plan.outputs.plan_summary }}
-            
+
             <details>
             <summary>Show Plan Details</summary>
-            
+
             \`\`\`
             ${{ steps.plan.outputs.plan_exit_code == '2' && 'Changes detected - see plan artifact' || 'No changes detected' }}
             \`\`\`
-            
+
             </details>
             `;
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -152,7 +152,7 @@ jobs:
   # ===========================================
   # TERRAFORM APPLY
   # ===========================================
-  
+
   apply:
     name: "🚀 Terraform Apply"
     runs-on: ubuntu-latest
@@ -187,7 +187,7 @@ jobs:
         run: |
           echo "🏃 Initializing Terraform..."
           terraform init -input=false
-          
+
           if [ "${{ matrix.workspace }}" != "default" ]; then
             terraform workspace select ${{ matrix.workspace }} || terraform workspace new ${{ matrix.workspace }}
           fi
@@ -212,7 +212,7 @@ jobs:
         run: |
           echo "📤 Exporting Terraform outputs..."
           terraform output -json > outputs.json
-          
+
           # Display key outputs
           if [ -s outputs.json ] && [ "$(cat outputs.json)" != "{}" ]; then
             echo "Key outputs:"
@@ -229,7 +229,7 @@ jobs:
   # ===========================================
   # TERRAFORM DESTROY
   # ===========================================
-  
+
   destroy:
     name: "💥 Terraform Destroy"
     runs-on: ubuntu-latest
@@ -266,7 +266,7 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: |
           terraform init -input=false
-          
+
           if [ "${{ matrix.workspace }}" != "default" ]; then
             terraform workspace select ${{ matrix.workspace }}
           fi
@@ -289,7 +289,7 @@ jobs:
   # ===========================================
   # SECURITY & COMPLIANCE
   # ===========================================
-  
+
   security:
     name: "🔒 Security & Compliance Scan"
     runs-on: ubuntu-latest
@@ -339,13 +339,13 @@ jobs:
           echo "- tfsec (Terraform security scanner)" >> security-report.md
           echo "" >> security-report.md
           echo "✅ Security scan completed" >> security-report.md
-          
+
           cat security-report.md
 
   # ===========================================
   # DRIFT DETECTION
   # ===========================================
-  
+
   drift:
     name: "🔄 Infrastructure Drift Detection"
     runs-on: ubuntu-latest
@@ -372,7 +372,7 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: |
           terraform init -input=false
-          
+
           if [ "${{ matrix.workspace }}" != "default" ]; then
             terraform workspace select ${{ matrix.workspace }}
           fi
@@ -381,14 +381,14 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: |
           echo "🔄 Checking for infrastructure drift..."
-          
+
           terraform plan -detailed-exitcode -input=false \
             -var="cluster_type=local" \
             -var="environment=dev" \
             > drift_output.txt 2>&1
-          
+
           DRIFT_EXIT_CODE=$?
-          
+
           if [ $DRIFT_EXIT_CODE -eq 2 ]; then
             echo "⚠️ Infrastructure drift detected in ${{ matrix.name }}!"
             cat drift_output.txt
@@ -411,7 +411,7 @@ jobs:
   # ===========================================
   # SUMMARY
   # ===========================================
-  
+
   summary:
     name: "📊 Terraform Summary"
     runs-on: ubuntu-latest
@@ -426,7 +426,7 @@ jobs:
           echo "Apply: ${{ needs.apply.result }}"
           echo "Security: ${{ needs.security.result }}"
           echo ""
-          
+
           if [[ "${{ needs.plan.result }}" == "success" && \
                 "${{ needs.security.result }}" == "success" ]]; then
             echo "✅ Terraform validation successful"

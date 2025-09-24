@@ -1,6 +1,30 @@
-variable "app_name" { type = string }
-variable "environment" { type = string }
-variable "cluster_type" { type = string }
-variable "kubernetes_namespace" { type = string }
-variable "networking_config" { type = any }
-variable "tags" { type = map(string); default = {} }
+variable "app_name" {
+  description = "Application name"
+  type        = string
+}
+
+variable "environment" {
+  description = "Environment name"
+  type        = string
+}
+
+variable "cluster_type" {
+  description = "Cluster type (local, aws, digitalocean)"
+  type        = string
+}
+
+variable "kubernetes_namespace" {
+  description = "Kubernetes namespace"
+  type        = string
+}
+
+variable "networking_config" {
+  description = "Networking configuration"
+  type        = any
+}
+
+variable "tags" {
+  description = "Resource tags"
+  type        = map(string)
+  default     = {}
+}

@@ -2,7 +2,7 @@
 
 terraform {
   required_version = ">= 1.0"
-  
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -25,7 +25,7 @@ terraform {
       version = "~> 2.0"
     }
   }
-  
+
   # Optional: Configure remote state
   # backend "s3" {
   #   bucket = "comind-ops-terraform-state"
@@ -50,7 +50,7 @@ provider "helm" {
 # AWS provider (for cloud deployments)
 provider "aws" {
   region = var.aws_region
-  
+
   # Skip credentials for local development
   skip_credentials_validation = var.cluster_type == "local"
   skip_requesting_account_id  = var.cluster_type == "local"
@@ -79,7 +79,7 @@ variable "cluster_type" {
 locals {
   environment = "dev"
   region      = var.aws_region
-  
+
   common_tags = {
     Environment = local.environment
     Project     = "comind-ops"

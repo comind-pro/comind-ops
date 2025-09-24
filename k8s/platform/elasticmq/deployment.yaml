@@ -108,27 +108,27 @@ metadata:
 data:
   elasticmq.conf: |
     include classpath("application.conf")
-    
+
     node-address {
       protocol = http
       host = "*"
       port = 9324
       context-path = ""
     }
-    
+
     rest-sqs {
       enabled = true
       bind-port = 9324
       bind-hostname = "0.0.0.0"
       sqs-limits = strict
     }
-    
+
     rest-stats {
       enabled = true
       bind-port = 9325
       bind-hostname = "0.0.0.0"
     }
-    
+
     queues {
       default {
         defaultVisibilityTimeout = 10 seconds
@@ -139,13 +139,13 @@ data:
           maxReceiveCount = 3
         }
       }
-      
+
       high-priority {
         defaultVisibilityTimeout = 10 seconds
         delay = 0 seconds
         receiveMessageWait = 0 seconds
       }
-      
+
       notifications {
         defaultVisibilityTimeout = 30 seconds
         delay = 0 seconds
@@ -155,14 +155,14 @@ data:
           maxReceiveCount = 5
         }
       }
-      
+
       # Dead letter queues
       default-dlq {
         defaultVisibilityTimeout = 30 seconds
         delay = 0 seconds
         receiveMessageWait = 0 seconds
       }
-      
+
       notifications-dlq {
         defaultVisibilityTimeout = 30 seconds
         delay = 0 seconds

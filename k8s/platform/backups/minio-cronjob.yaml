@@ -36,19 +36,19 @@ spec:
             - -c
             - |
               set -e
-              
+
               # Backup configuration
               BACKUP_NAME="minio-backup-$(date +%Y%m%d-%H%M%S)"
               BACKUP_PATH="/backups/${BACKUP_NAME}"
               RETENTION_DAYS=${RETENTION_DAYS:-7}
-              
+
               echo "Starting MinIO backup: $BACKUP_NAME"
               echo "Timestamp: $(date)"
               echo "Retention: $RETENTION_DAYS days"
-              
+
               # Configure MinIO client for source and destination
               mc alias set source "$MINIO_SOURCE_ENDPOINT" "$MINIO_SOURCE_ACCESS_KEY" "$MINIO_SOURCE_SECRET_KEY"
-              
+
               # Configure backup destination (could be external S3, another MinIO, etc.)
               if [ -n "$BACKUP_ENDPOINT" ]; then
                 mc alias set backup "$BACKUP_ENDPOINT" "$BACKUP_ACCESS_KEY" "$BACKUP_SECRET_KEY"
@@ -58,17 +58,17 @@ spec:
                 BACKUP_DEST="$BACKUP_PATH"
                 mkdir -p "$BACKUP_DEST"
               fi
-              
+
               # Get list of buckets to backup
               BUCKETS=$(mc ls source/ | awk '{print $5}' | grep -v '^$')
-              
+
               if [ -z "$BUCKETS" ]; then
                 echo "No buckets found to backup"
                 exit 0
               fi
-              
+
               echo "Found buckets to backup: $BUCKETS"
-              
+
               # Create backup metadata
               cat > "/tmp/backup-metadata.json" << EOF
               {
@@ -78,13 +78,13 @@ spec:
                 "backup_type": "incremental",
                 "buckets": [
               EOF
-              
+
               FIRST_BUCKET=true
               TOTAL_SIZE=0
-              
+
               for bucket in $BUCKETS; do
                 echo "Backing up bucket: $bucket"
-                
+
                 # Add bucket to metadata (JSON formatting)
                 if [ "$FIRST_BUCKET" = "true" ]; then
                   FIRST_BUCKET=false
@@ -92,7 +92,7 @@ spec:
                   echo "," >> /tmp/backup-metadata.json
                 fi
                 echo "      \"$bucket\"" >> /tmp/backup-metadata.json
-                
+
                 if [ -n "$BACKUP_ENDPOINT" ]; then
                   # Mirror to external storage
                   echo "Mirroring $bucket to external backup storage..."
@@ -102,14 +102,14 @@ spec:
                   echo "Copying $bucket to local backup storage..."
                   mc mirror source/$bucket $BACKUP_DEST/$bucket --overwrite
                 fi
-                
+
                 # Calculate bucket size
                 BUCKET_SIZE=$(mc du source/$bucket --json | jq -r '.size' | awk '{sum += $1} END {print sum}')
                 TOTAL_SIZE=$((TOTAL_SIZE + BUCKET_SIZE))
-                
+
                 echo "Bucket $bucket backup completed (Size: $(echo $BUCKET_SIZE | numfmt --to=iec))"
               done
-              
+
               # Complete backup metadata
               cat >> /tmp/backup-metadata.json << EOF
                 ],
@@ -118,19 +118,19 @@ spec:
                 "status": "completed"
               }
               EOF
-              
+
               # Save metadata
               if [ -n "$BACKUP_ENDPOINT" ]; then
                 mc cp /tmp/backup-metadata.json backup/$MINIO_BACKUP_BUCKET/minio-backups/$BACKUP_NAME/metadata.json
               else
                 cp /tmp/backup-metadata.json $BACKUP_DEST/metadata.json
               fi
-              
+
               echo "Backup metadata created"
-              
+
               # Clean up old backups
               echo "Cleaning up backups older than $RETENTION_DAYS days..."
-              
+
               if [ -n "$BACKUP_ENDPOINT" ]; then
                 # Clean up external backups
                 OLD_BACKUPS=$(mc find backup/$MINIO_BACKUP_BUCKET/minio-backups/ --name "minio-backup-*" --older-than "${RETENTION_DAYS}d" | head -n 10)
@@ -142,10 +142,10 @@ spec:
                 # Clean up local backups
                 find /backups -name "minio-backup-*" -type d -mtime +$RETENTION_DAYS -exec rm -rf {} \; || true
               fi
-              
+
               echo "MinIO backup completed successfully at $(date)"
               echo "Total backup size: $(echo $TOTAL_SIZE | numfmt --to=iec)"
-              
+
             env:
             # Source MinIO configuration
             - name: MINIO_SOURCE_ENDPOINT
@@ -163,7 +163,7 @@ spec:
                 secretKeyRef:
                   name: minio-backup-secrets
                   key: source-secret-key
-            
+
             # Backup destination configuration (optional - external storage)
             - name: BACKUP_ENDPOINT
               valueFrom:

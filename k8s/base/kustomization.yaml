@@ -13,7 +13,7 @@ commonLabels:
   app.kubernetes.io/managed-by: kustomize
   app.kubernetes.io/part-of: comind-ops-platform
 
-namespace: default
+# Note: No global namespace transformation as resources define their own namespaces
 
 # Optional: Add common annotations
 commonAnnotations:
