@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comind-Ops Platform Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .status-healthy { color: #10b981; }
+        .status-warning { color: #f59e0b; }
+        .status-unhealthy { color: #ef4444; }
+        .pulse-dot { animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="gradient-bg text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-chart-line text-2xl"></i>
+                    <h1 class="text-2xl font-bold">Comind-Ops Platform</h1>
+                    <span class="bg-white bg-opacity-20 px-2 py-1 rounded text-sm" id="environment-badge">Loading...</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="pulse-dot w-3 h-3 bg-green-400 rounded-full"></div>
+                    <span class="text-sm" id="status-text">Platform Online</span>
+                    <span class="text-xs opacity-75" id="last-updated">Just now</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-8">
+        <!-- Platform Overview -->
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+            <div class="lg:col-span-3">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fas fa-info-circle text-blue-500 mr-2"></i>
+                        Platform Overview
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div class="text-center p-4 bg-blue-50 rounded-lg">
+                            <i class="fas fa-rocket text-blue-500 text-2xl mb-2"></i>
+                            <div class="text-2xl font-bold text-blue-600" id="platform-version">v1.0.0</div>
+                            <div class="text-gray-600">Version</div>
+                        </div>
+                        <div class="text-center p-4 bg-green-50 rounded-lg">
+                            <i class="fas fa-clock text-green-500 text-2xl mb-2"></i>
+                            <div class="text-2xl font-bold text-green-600" id="platform-uptime">Loading...</div>
+                            <div class="text-gray-600">Uptime</div>
+                        </div>
+                        <div class="text-center p-4 bg-purple-50 rounded-lg">
+                            <i class="fas fa-server text-purple-500 text-2xl mb-2"></i>
+                            <div class="text-2xl font-bold text-purple-600" id="services-count">Loading...</div>
+                            <div class="text-gray-600">Services</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4 flex items-center">
+                    <i class="fas fa-heartbeat text-red-500 mr-2"></i>
+                    Health Status
+                </h3>
+                <div class="space-y-3" id="health-summary">
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600">Platform</span>
+                        <span class="status-healthy"><i class="fas fa-check-circle"></i> Healthy</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600">Services</span>
+                        <span class="status-healthy" id="services-health">Loading...</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-gray-600">External</span>
+                        <span class="status-warning" id="external-health">Checking...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Platform Services -->
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold mb-6 flex items-center">
+                <i class="fas fa-cogs text-gray-700 mr-3"></i>
+                Platform Services
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6" id="services-grid">
+                <!-- Services will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Access Credentials -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4 flex items-center">
+                    <i class="fas fa-key text-yellow-500 mr-2"></i>
+                    Platform Access
+                </h3>
+                <div class="space-y-3">
+                    <div class="border-l-4 border-blue-500 pl-4">
+                        <div class="font-medium">ArgoCD</div>
+                        <div class="text-sm text-gray-600">Username: <code class="bg-gray-100 px-1 rounded">admin</code></div>
+                        <div class="text-xs text-gray-500">Password: Check ArgoCD secret in cluster</div>
+                    </div>
+                    <div class="border-l-4 border-green-500 pl-4">
+                        <div class="font-medium">MinIO Console</div>
+                        <div class="text-sm text-gray-600">Username: <code class="bg-gray-100 px-1 rounded">comind_ops_minio_admin</code></div>
+                        <div class="text-sm text-gray-600">Password: <code class="bg-gray-100 px-1 rounded">comind_ops_minio_password</code></div>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-lg font-semibold mb-4 flex items-center">
+                    <i class="fas fa-database text-purple-500 mr-2"></i>
+                    External Services
+                </h3>
+                <div class="space-y-3">
+                    <div class="border-l-4 border-purple-500 pl-4">
+                        <div class="font-medium">PostgreSQL</div>
+                        <div class="text-sm text-gray-600">Host: <code class="bg-gray-100 px-1 rounded">localhost:5434</code></div>
+                        <div class="text-sm text-gray-600">User: <code class="bg-gray-100 px-1 rounded">comind_ops_user</code></div>
+                        <div class="text-sm text-gray-600">Database: <code class="bg-gray-100 px-1 rounded">comind_ops_dev</code></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                <i class="fas fa-bolt text-orange-500 mr-2"></i>
+                Quick Actions
+            </h3>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <button onclick="refreshStatus()" class="flex items-center justify-center px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors">
+                    <i class="fas fa-sync-alt mr-2"></i>
+                    Refresh Status
+                </button>
+                <button onclick="window.open('/health', '_blank')" class="flex items-center justify-center px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors">
+                    <i class="fas fa-heart mr-2"></i>
+                    Health Check
+                </button>
+                <button onclick="window.open('/api/platform/info', '_blank')" class="flex items-center justify-center px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 transition-colors">
+                    <i class="fas fa-info mr-2"></i>
+                    Platform Info
+                </button>
+                <button onclick="window.open('https://github.com/comind-pro/comind-ops', '_blank')" class="flex items-center justify-center px-4 py-2 bg-gray-700 text-white rounded hover:bg-gray-800 transition-colors">
+                    <i class="fab fa-github mr-2"></i>
+                    GitHub
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white mt-12">
+        <div class="container mx-auto px-6 py-4">
+            <div class="text-center">
+                <p>&copy; 2025 Comind-Ops Platform. Built with ❤️ for DevOps Excellence.</p>
+                <p class="text-sm text-gray-400 mt-2">
+                    Platform Engineering • GitOps • Kubernetes • Self-Healing Infrastructure
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        let platformData = {};
+        let servicesData = {};
+
+        // Load platform info and services status
+        async function loadDashboard() {
+            try {
+                // Load platform info
+                const platformResponse = await fetch('/api/platform/info');
+                platformData = await platformResponse.json();
+                updatePlatformInfo();
+
+                // Load services status
+                const servicesResponse = await fetch('/api/services/status');
+                servicesData = await servicesResponse.json();
+                updateServicesStatus();
+
+                updateLastRefresh();
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        function updatePlatformInfo() {
+            document.getElementById('environment-badge').textContent = platformData.environment || 'development';
+            document.getElementById('platform-version').textContent = `v${platformData.version || '1.0.0'}`;
+            
+            const uptime = Math.floor(platformData.uptime || 0);
+            const hours = Math.floor(uptime / 3600);
+            const minutes = Math.floor((uptime % 3600) / 60);
+            document.getElementById('platform-uptime').textContent = `${hours}h ${minutes}m`;
+            
+            const servicesCount = Object.keys(platformData.services || {}).length;
+            document.getElementById('services-count').textContent = servicesCount;
+        }
+
+        function updateServicesStatus() {
+            const servicesGrid = document.getElementById('services-grid');
+            const healthyServices = Object.values(servicesData).filter(s => s.status === 'healthy').length;
+            const totalServices = Object.keys(servicesData).length;
+            
+            // Update services health summary
+            const healthText = totalServices > 0 ? `${healthyServices}/${totalServices} Healthy` : 'Loading...';
+            const healthClass = healthyServices === totalServices ? 'status-healthy' : 'status-warning';
+            document.getElementById('services-health').innerHTML = `<span class="${healthClass}"><i class="fas fa-circle"></i> ${healthText}</span>`;
+
+            // Generate services grid
+            servicesGrid.innerHTML = '';
+            Object.entries(platformData.services || {}).forEach(([key, service]) => {
+                const status = servicesData[key] || { status: 'unknown', name: service.name };
+                const statusIcon = status.status === 'healthy' ? 'fa-check-circle status-healthy' : 
+                                 status.status === 'warning' ? 'fa-exclamation-triangle status-warning' : 
+                                 'fa-times-circle status-unhealthy';
+                
+                const serviceCard = `
+                    <div class="bg-white rounded-lg shadow-md p-4 card-hover cursor-pointer" onclick="window.open('${service.url}', '_blank')">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-2xl">${service.icon}</span>
+                            <i class="fas ${statusIcon}"></i>
+                        </div>
+                        <h4 class="font-semibold text-gray-800">${service.name}</h4>
+                        <p class="text-sm text-gray-600 mb-2">${service.description}</p>
+                        <div class="text-xs text-gray-500">
+                            Status: <span class="capitalize ${status.status === 'healthy' ? 'text-green-600' : status.status === 'warning' ? 'text-yellow-600' : 'text-red-600'}">${status.status}</span>
+                        </div>
+                    </div>
+                `;
+                servicesGrid.innerHTML += serviceCard;
+            });
+        }
+
+        function updateLastRefresh() {
+            document.getElementById('last-updated').textContent = new Date().toLocaleTimeString();
+        }
+
+        function refreshStatus() {
+            loadDashboard();
+        }
+
+        // Load dashboard on page load
+        loadDashboard();
+
+        // Auto-refresh every 30 seconds
+        setInterval(loadDashboard, 30000);
+    </script>
+</body>
+</html>

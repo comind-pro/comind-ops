@@ -42,7 +42,7 @@ services:
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
       - ./postgres/config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     ports:
-      - "5432:5432"
+      - "5434:5432"
     networks:
       comind-ops-network:
         ipv4_address: 172.20.0.10

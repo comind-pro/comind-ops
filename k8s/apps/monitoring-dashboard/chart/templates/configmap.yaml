@@ -1,0 +1,125 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "monitoring-dashboard.fullname" . }}-code
+  labels:
+    {{- include "monitoring-dashboard.labels" . | nindent 4 }}
+data:
+  package.json: |
+    {
+      "name": "comind-ops-monitoring-dashboard",
+      "version": "1.0.0",
+      "description": "Comind-Ops Platform Monitoring Dashboard",
+      "main": "server.js",
+      "scripts": {
+        "start": "node server.js"
+      },
+      "dependencies": {
+        "express": "^4.18.2"
+      }
+    }
+  server.js: |
+    const express = require('express');
+    const app = express();
+    const PORT = process.env.PORT || 8080;
+
+    // Simple monitoring dashboard
+    app.get('/', (req, res) => {
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Comind-Ops Platform Dashboard</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+            .header { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+            .card { background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+            .services { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; }
+            .service { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+            .service a { color: #007bff; text-decoration: none; }
+            .service a:hover { text-decoration: underline; }
+            .status { color: #28a745; font-weight: bold; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>🎯 Comind-Ops Platform Dashboard</h1>
+            <p>Your GitOps Platform Monitoring & Admin Center</p>
+          </div>
+          
+          <div class="card">
+            <h2>📊 Platform Status</h2>
+            <p>Platform: <span class="status">ONLINE</span></p>
+            <p>Environment: Development</p>
+            <p>Uptime: ${Math.floor(process.uptime())} seconds</p>
+          </div>
+          
+          <div class="card">
+            <h2>🔗 Platform Services</h2>
+            <div class="services">
+              <div class="service">
+                <h3>🔄 ArgoCD</h3>
+                <p>GitOps Dashboard</p>
+                <a href="http://argocd.dev.127.0.0.1.nip.io:8080" target="_blank">Open ArgoCD</a>
+              </div>
+              <div class="service">
+                <h3>💾 MinIO</h3>
+                <p>Object Storage</p>
+                <a href="http://localhost:9001" target="_blank">Open MinIO Console</a>
+              </div>
+              <div class="service">
+                <h3>📦 Registry</h3>
+                <p>Container Registry</p>
+                <a href="http://registry.dev.127.0.0.1.nip.io:8080" target="_blank">Open Registry</a>
+              </div>
+              <div class="service">
+                <h3>📬 ElasticMQ</h3>
+                <p>Message Queue</p>
+                <a href="http://elasticmq.dev.127.0.0.1.nip.io:8080" target="_blank">Open ElasticMQ</a>
+              </div>
+            </div>
+          </div>
+          
+          <div class="card">
+            <h2>🔐 Access Credentials</h2>
+            <h3>ArgoCD:</h3>
+            <p>Username: <code>admin</code><br>
+            Password: Check ArgoCD secret in cluster</p>
+            
+            <h3>MinIO Console:</h3>
+            <p>Username: <code>comind_ops_minio_admin</code><br>
+            Password: <code>comind_ops_minio_password</code></p>
+            
+            <h3>PostgreSQL:</h3>
+            <p>Host: <code>localhost:5434</code><br>
+            Username: <code>comind_ops_user</code><br>
+            Database: <code>comind_ops_dev</code></p>
+          </div>
+          
+          <div class="card">
+            <h2>⚡ Quick Actions</h2>
+            <a href="/health" target="_blank">🏥 Health Check</a> |
+            <a href="https://github.com/comind-pro/comind-ops" target="_blank">💻 GitHub Repository</a>
+          </div>
+          
+          <footer style="text-align: center; margin-top: 40px; color: #666;">
+            <p>🌟 Comind-Ops Platform - Built with ❤️ for DevOps Excellence</p>
+          </footer>
+        </body>
+        </html>
+      `);
+    });
+
+    app.get('/health', (req, res) => {
+      res.json({
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        platform: 'Comind-Ops Platform',
+        version: '1.0.0'
+      });
+    });
+
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Comind-Ops Monitoring Dashboard running on port ${PORT}`);
+    });

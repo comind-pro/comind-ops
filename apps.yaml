@@ -27,40 +27,38 @@ infrastructure:
 
 # Applications
 applications:
-  # Sample Application
-  sample-app:
-    description: "Sample application demonstrating the comind-ops platform patterns"
+  # Platform Monitoring Dashboard
+  monitoring-dashboard:
+    description: "Platform monitoring dashboard and landing page with service status, admin details, and quick access links"
     team: platform
     port: 8080
     repository:
       url: https://github.com/comind-pro/comind-ops
-      path: k8s/apps/sample-app
+      path: k8s/apps/monitoring-dashboard
     environments:
       dev:
         enabled: true
         branch: main
-        hostname: sample-app.dev.127.0.0.1.nip.io
+        hostname: monitoring.dev.127.0.0.1.nip.io
         replicas: 1
         resources:
           requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
             cpu: 100m
             memory: 128Mi
-          limits:
-            cpu: 200m
-            memory: 256Mi
         database:
-          enabled: true
-          type: postgresql
-          name: sample_app_dev
+          enabled: false  # Dashboard doesn't need persistent storage
         monitoring:
           enabled: true
       stage:
         enabled: false
         branch: main
-        hostname: sample-app.stage.comind-ops.io
-        replicas: 2
+        hostname: monitoring.stage.comind.pro
+        replicas: 1
       prod:
         enabled: false
         branch: main
-        hostname: sample-app.comind-ops.io
-        replicas: 3
+        hostname: monitoring.comind.pro
+        replicas: 1
