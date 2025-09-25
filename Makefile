@@ -69,6 +69,11 @@ bootstrap: ## Complete cluster setup (core infrastructure + platform services)
 	@echo ""
 	@$(MAKE) --no-print-directory status
 
+check-deps: ## Check if all required dependencies are installed
+	@echo "$(BLUE)🔍 Checking platform dependencies...$(NC)"
+	@./scripts/check-deps.sh
+	@echo "$(GREEN)✅ All dependencies verified$(NC)"
+
 # ===========================================
 # 🐳 EXTERNAL SERVICES (PostgreSQL, MinIO)
 # ===========================================
