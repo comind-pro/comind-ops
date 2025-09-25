@@ -174,6 +174,77 @@ if [[ -z "$WORKSPACE" ]]; then
     WORKSPACE="$ENVIRONMENT"
 fi
 
+# Configure providers based on profile (for app terraform)
+if [[ "$APP_NAME" != "core" ]]; then
+    log "Configuring providers for $PROFILE profile..."
+    
+    if [[ "$PROFILE" == "local" ]]; then
+        cat > "providers_override.tf" << 'EOF'
+# Provider override for local k3d environment
+provider "kubernetes" {
+  config_path    = "~/.kube/config"
+  config_context = "k3d-comind-ops-dev"
+}
+
+provider "helm" {
+  kubernetes {
+    config_path    = "~/.kube/config"
+    config_context = "k3d-comind-ops-dev"
+  }
+}
+
+# AWS provider with mock credentials (required by modules)
+provider "aws" {
+  region                      = "us-east-1"
+  skip_credentials_validation = true
+  skip_requesting_account_id  = true
+  skip_metadata_api_check     = true
+  access_key                  = "mock"
+  secret_key                  = "mock"
+}
+
+provider "digitalocean" {
+  # Mock token for local development  
+  token = "mock"
+}
+EOF
+    elif [[ "$PROFILE" == "aws" ]]; then
+        cat > "providers_override.tf" << 'EOF'
+# Provider override for AWS environment
+# Note: For production AWS deployments, configure these providers
+# based on your specific EKS cluster configuration
+
+provider "kubernetes" {
+  config_path    = "~/.kube/config"
+  config_context_cluster = "your-aws-eks-cluster"
+  # Alternatively, use exec authentication:
+  # exec {
+  #   api_version = "client.authentication.k8s.io/v1beta1"
+  #   command     = "aws"
+  #   args        = ["eks", "get-token", "--cluster-name", "your-cluster-name"]
+  # }
+}
+
+provider "helm" {
+  kubernetes {
+    config_path    = "~/.kube/config"
+    config_context_cluster = "your-aws-eks-cluster"
+  }
+}
+
+# AWS provider - uses AWS credentials from environment/profile
+provider "aws" {
+  region = "us-east-1"
+}
+
+# DigitalOcean provider (optional)
+provider "digitalocean" {
+  token = "your-do-token-here"
+}
+EOF
+    fi
+fi
+
 # Initialize if needed
 if [[ ! -d ".terraform" ]]; then
     log "Initializing Terraform..."

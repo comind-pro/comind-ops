@@ -165,9 +165,9 @@ argo-apps: ## List all ArgoCD applications
 # ===========================================
 
 .PHONY: new-app
-new-app: ## Create new application (APP=name TEAM=team)
+new-app: ## Create new application (APP=name TEAM=team PROFILE=local)
 	@echo "$(BLUE)📱 Creating new application: $(APP)$(NC)"
-	@./scripts/new-app.sh $(APP) --team $(TEAM)
+	@./scripts/new-app.sh $(APP) --team $(TEAM) --profile $(PROFILE)
 	@echo "$(GREEN)✅ Application $(APP) created successfully!$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Next steps:$(NC)"
@@ -176,9 +176,9 @@ new-app: ## Create new application (APP=name TEAM=team)
 	@echo "3. Deploy: git add -A && git commit && git push"
 
 .PHONY: new-app-full
-new-app-full: ## Create application with full infrastructure (APP=name TEAM=team)
-	@echo "$(BLUE)📱 Creating application $(APP) with infrastructure...$(NC)"
-	@./scripts/new-app.sh $(APP) --team $(TEAM) --with-database --with-queue --with-terraform
+new-app-full: ## Create application with full infrastructure (APP=name TEAM=team PROFILE=local)
+	@echo "$(BLUE)📱 Creating application $(APP) with infrastructure for $(PROFILE) profile...$(NC)"
+	@./scripts/new-app.sh $(APP) --team $(TEAM) --profile $(PROFILE) --with-database --with-queue --with-terraform
 	@echo "$(GREEN)✅ Application $(APP) created with complete infrastructure!$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Next steps:$(NC)"
@@ -188,21 +188,21 @@ new-app-full: ## Create application with full infrastructure (APP=name TEAM=team
 	@echo "4. Deploy: git add -A && git commit && git push"
 
 .PHONY: new-app-api
-new-app-api: ## Create API application with database (APP=name TEAM=team PORT=3000)
+new-app-api: ## Create API application with database (APP=name TEAM=team PORT=3000 PROFILE=local)
 	@echo "$(BLUE)📱 Creating API application: $(APP)$(NC)"
-	@./scripts/new-app.sh $(APP) --team $(TEAM) --with-database --with-terraform --port $(or $(PORT),3000)
+	@./scripts/new-app.sh $(APP) --team $(TEAM) --profile $(PROFILE) --with-database --with-terraform --port $(or $(PORT),3000)
 	@echo "$(GREEN)✅ API application $(APP) created!$(NC)"
 
 .PHONY: new-app-worker
-new-app-worker: ## Create worker application with queue (APP=name TEAM=team)  
+new-app-worker: ## Create worker application with queue (APP=name TEAM=team PROFILE=local)  
 	@echo "$(BLUE)📱 Creating worker application: $(APP)$(NC)"
-	@./scripts/new-app.sh $(APP) --team $(TEAM) --with-queue --with-database --with-terraform --sync-wave 20
+	@./scripts/new-app.sh $(APP) --team $(TEAM) --profile $(PROFILE) --with-queue --with-database --with-terraform --sync-wave 20
 	@echo "$(GREEN)✅ Worker application $(APP) created!$(NC)"
 
 .PHONY: new-app-simple
-new-app-simple: ## Create minimal application (APP=name TEAM=team)
+new-app-simple: ## Create minimal application (APP=name TEAM=team PROFILE=local)
 	@echo "$(BLUE)📱 Creating simple application: $(APP)$(NC)"
-	@./scripts/new-app.sh $(APP) --team $(TEAM) --language $(or $(LANGUAGE),generic)
+	@./scripts/new-app.sh $(APP) --team $(TEAM) --profile $(PROFILE) --language $(or $(LANGUAGE),generic)
 	@echo "$(GREEN)✅ Simple application $(APP) created!$(NC)"
 
 .PHONY: list-apps
@@ -248,35 +248,35 @@ tf-output: ## Show Terraform outputs (ENV=env APP=app)
 
 # Application-specific Terraform commands
 .PHONY: tf-init-app
-tf-init-app: ## Initialize Terraform for application (APP=name)
+tf-init-app: ## Initialize Terraform for application (APP=name PROFILE=local)
 	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP). Run: make new-app-full APP=$(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)🔧 Initializing Terraform for $(APP)...$(NC)"
-	@cd k8s/apps/$(APP)/terraform && terraform init
+	@./scripts/tf.sh $(ENV) $(APP) init --profile $(PROFILE)
 
 .PHONY: tf-plan-app  
-tf-plan-app: ## Plan Terraform for application (APP=name)
+tf-plan-app: ## Plan Terraform for application (APP=name PROFILE=local)
 	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)📋 Planning Terraform changes for $(APP)...$(NC)"
-	@cd k8s/apps/$(APP)/terraform && terraform plan
+	@./scripts/tf.sh $(ENV) $(APP) plan --profile $(PROFILE)
 
 .PHONY: tf-apply-app
-tf-apply-app: ## Apply Terraform for application (APP=name)
+tf-apply-app: ## Apply Terraform for application (APP=name PROFILE=local)
 	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)🚀 Applying Terraform for $(APP)...$(NC)"
-	@cd k8s/apps/$(APP)/terraform && terraform apply
+	@./scripts/tf.sh $(ENV) $(APP) apply --auto-approve --profile $(PROFILE)
 
 .PHONY: tf-destroy-app
-tf-destroy-app: ## Destroy Terraform resources for application (APP=name)
+tf-destroy-app: ## Destroy Terraform resources for application (APP=name PROFILE=local)
 	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(YELLOW)⚠️  This will destroy all infrastructure for $(APP). Are you sure? (y/N)$(NC)"
 	@read -r confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "Cancelled." && exit 1)
-	@cd k8s/apps/$(APP)/terraform && terraform destroy
+	@./scripts/tf.sh $(ENV) $(APP) destroy --auto-approve --profile $(PROFILE)
 
 .PHONY: tf-output-app
-tf-output-app: ## Show Terraform outputs for application (APP=name)
+tf-output-app: ## Show Terraform outputs for application (APP=name PROFILE=local)
 	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)📤 Terraform outputs for $(APP):$(NC)"
-	@cd k8s/apps/$(APP)/terraform && terraform output
+	@./scripts/tf.sh $(ENV) $(APP) output --profile $(PROFILE)
 
 .PHONY: tf-status-app
 tf-status-app: ## Show Terraform status for application (APP=name)

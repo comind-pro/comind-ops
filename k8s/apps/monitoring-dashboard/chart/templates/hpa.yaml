@@ -2,15 +2,15 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "sample-app.fullname" . }}
+  name: {{ include "monitoring-dashboard.fullname" . }}
   namespace: {{ .Values.namespace }}
   labels:
-    {{- include "sample-app.labels" . | nindent 4 }}
+    {{- include "monitoring-dashboard.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "sample-app.fullname" . }}
+    name: {{ include "monitoring-dashboard.fullname" . }}
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:

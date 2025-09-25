@@ -1,0 +1,114 @@
+# Service Registry Configuration
+# Central registry for all Docker services
+# YAML format for easy parsing
+
+services:
+  # Core Platform Services
+  postgresql:
+    enabled: true
+    module: postgresql
+    config:
+      version: "15-alpine"
+      port: 5432
+      database: "comind_ops_dev"
+      username: "comind_ops_user"
+      password: "comind_ops_password"
+      data_directory: "./data/postgresql"
+      backup_enabled: true
+      backup_schedule: "0 2 * * *"
+    dependencies: []
+    healthcheck:
+      command: "pg_isready -U ${username}"
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+
+  minio:
+    enabled: true
+    module: minio
+    config:
+      version: "latest"
+      console_port: 9001
+      api_port: 9000
+      access_key: "comind_ops_minio_admin"
+      secret_key: "comind_ops_minio_password"
+      data_directory: "./data/minio"
+      buckets: ["uploads", "backups", "logs"]
+    dependencies: []
+    healthcheck:
+      command: "curl -f http://localhost:9000/minio/health/live"
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+
+  redis:
+    enabled: false
+    module: redis
+    config:
+      version: "7-alpine"
+      port: 6379
+      password: "comind_ops_redis_password"
+      data_directory: "./data/redis"
+      persistence: true
+    dependencies: []
+    healthcheck:
+      command: "redis-cli ping"
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+
+  elasticmq:
+    enabled: false
+    module: elasticmq
+    config:
+      version: "latest"
+      port: 9324
+      data_directory: "./data/elasticmq"
+      queues: ["default", "notifications", "processing"]
+    dependencies: []
+    healthcheck:
+      command: "curl -f http://localhost:9324/health"
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+
+  # External Services (can be added later)
+  external_example:
+    enabled: false
+    module: external
+    config:
+      image: "nginx:alpine"
+      port: 8080
+      environment:
+        NGINX_HOST: "example.com"
+        NGINX_PORT: "80"
+      volumes:
+        "./config/nginx.conf": "/etc/nginx/nginx.conf"
+    dependencies: []
+    healthcheck:
+      command: "curl -f http://localhost:8080/health"
+      interval: "30s"
+      timeout: "10s"
+      retries: 3
+
+# Service discovery configuration
+discovery:
+  network_name: "comind-ops-network"
+  data_directory: "./data"
+  log_directory: "./logs"
+  config_directory: "./config"
+  
+  # Service management
+  management:
+    auto_start: true
+    auto_restart: true
+    health_check_interval: "30s"
+    backup_enabled: true
+    monitoring_enabled: true
+  
+  # External service integration
+  external_services:
+    enabled: true
+    discovery_method: "registry"
+    config_source: "terraform"
+    update_strategy: "rolling"

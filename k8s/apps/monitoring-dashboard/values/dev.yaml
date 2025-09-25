@@ -1,20 +1,25 @@
 # Development environment configuration
-# This demonstrates platform capabilities with relaxed security for development
+# Monitoring Dashboard - Platform status and service access
 
 # Global configuration
 global:
   environment: dev
   domain: dev.127.0.0.1.nip.io
-  namespace: sample-app-dev
+  
+# Namespace
+namespace: monitoring-dashboard-dev
 
 # Application scaling
 replicaCount: 1
 
 # Container image configuration
 image:
-  repository: nginx
-  pullPolicy: Always
-  tag: "1.21-alpine"
+  repository: monitoring-dashboard
+  pullPolicy: Never  # Use local image (imported into k3d cluster)
+  tag: "dev"
+
+# Code deployment method
+useConfigMapCode: false  # Use Docker image instead of ConfigMap for code
 
 # Service configuration
 service:
@@ -32,7 +37,7 @@ ingress:
     nginx.ingress.kubernetes.io/rate-limit: "100"
     nginx.ingress.kubernetes.io/enable-cors: "true"
   hosts:
-    - host: sample-app.dev.127.0.0.1.nip.io
+    - host: monitoring.dev.127.0.0.1.nip.io
       paths:
         - path: /
           pathType: Prefix
@@ -64,40 +69,22 @@ env:
   NODE_ENV: development
   PORT: "8080"
   LOG_LEVEL: debug
-  APP_NAME: sample-app
+  APP_NAME: monitoring-dashboard
   APP_VERSION: "1.0.0"
   ENABLE_METRICS: "true"
   ENABLE_TRACING: "false"
   ENABLE_DEBUG: "true"
 
-# Platform service integrations (enabled for demo)
+# Platform service integrations (monitoring dashboard doesn't need database/queue/storage)
 platformServices:
   database:
-    enabled: true
-    host: sample-app-postgres-external
-    port: 5432
-    name: sample_app_dev
-    user: sample_app_user
-    pool:
-      min: 1
-      max: 5
+    enabled: false
 
   queue:
-    enabled: true
-    host: elasticmq.platform-dev.svc.cluster.local
-    port: 9324
-    region: elasticmq
-    queues:
-      - default
-      - notifications
+    enabled: false
 
   storage:
-    enabled: true
-    endpoint: sample-app-minio-external:9000
-    secure: false
-    buckets:
-      - sample-app-uploads-dev
-      - sample-app-backups-dev
+    enabled: false
 
   cache:
     enabled: false
@@ -123,7 +110,7 @@ networkPolicy:
     - from:
       - namespaceSelector:
           matchLabels:
-            name: sample-app-dev
+            name: monitoring-dashboard-dev
   egress:
     - to:
       - namespaceSelector:
@@ -134,14 +121,21 @@ networkPolicy:
       - protocol: UDP
         port: 53   # DNS
 
+# Service Account
+serviceAccount:
+  create: true
+  automount: true
+  annotations: {}
+  name: ""
+
 # Pod Disruption Budget
 podDisruptionBudget:
   enabled: false  # Disabled for single replica
 
-# Jobs configuration
+# Jobs configuration (disabled for monitoring dashboard)
 jobs:
   - name: db-seed
-    enabled: true
+    enabled: false
     image: postgres:15-alpine
     restartPolicy: OnFailure
     backoffLimit: 3

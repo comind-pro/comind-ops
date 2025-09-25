@@ -1,5 +1,5 @@
 {{- if .Values.ingress.enabled -}}
-{{- $fullName := include "sample-app.fullname" . -}}
+{{- $fullName := include "monitoring-dashboard.fullname" . -}}
 {{- $svcPort := .Values.service.port -}}
 {{- if and .Values.ingress.className (not (hasKey .Values.ingress.annotations "kubernetes.io/ingress.class")) }}
   {{- $_ := set .Values.ingress.annotations "kubernetes.io/ingress.class" .Values.ingress.className}}
@@ -16,7 +16,7 @@ metadata:
   name: {{ $fullName }}
   namespace: {{ .Values.namespace }}
   labels:
-    {{- include "sample-app.labels" . | nindent 4 }}
+    {{- include "monitoring-dashboard.labels" . | nindent 4 }}
   {{- with .Values.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}

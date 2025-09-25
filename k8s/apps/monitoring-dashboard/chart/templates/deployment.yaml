@@ -52,13 +52,17 @@ spec:
             periodSeconds: 5
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          {{- if .Values.useConfigMapCode }}
           volumeMounts:
             - name: app-code
               mountPath: /app
+          {{- end }}
+      {{- if .Values.useConfigMapCode }}
       volumes:
         - name: app-code
           configMap:
             name: {{ include "monitoring-dashboard.fullname" . }}-code
+      {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -15,6 +15,7 @@ Options:
     --port PORT              Service port (default: 8080)
     --sync-wave WAVE         ArgoCD sync wave (default: 10)
     --language LANG          Application language (generic|node|python|go|java)
+    --profile PROFILE        Infrastructure profile: local, aws (default: local)
     --with-database          Include database configuration
     --with-cache             Include Redis cache configuration  
     --with-queue             Include queue (ElasticMQ) configuration
@@ -23,8 +24,9 @@ Options:
 
 Examples:
     $0 my-api --team backend --port 3000 --with-database --with-terraform
-    $0 my-frontend --team frontend --language node --port 3000
-    $0 my-worker --team backend --with-queue --sync-wave 20 --with-terraform
+    $0 my-api --team backend --profile aws --with-database --with-terraform
+    $0 my-frontend --team frontend --language node --port 3000 --profile local
+    $0 my-worker --team backend --with-queue --sync-wave 20 --with-terraform --profile aws
 EOF
 }
 
@@ -45,6 +47,7 @@ DESCRIPTION="${DESCRIPTION:-"Generated application for $APP_NAME"}"
 PORT="${PORT:-8080}"
 SYNC_WAVE="${SYNC_WAVE:-10}"
 LANGUAGE="${LANGUAGE:-generic}"
+PROFILE="${PROFILE:-local}"
 DATABASE="${DATABASE:-false}"
 CACHE="${CACHE:-false}"
 QUEUE="${QUEUE:-false}"
@@ -67,6 +70,7 @@ Options:
     --port PORT              Service port (default: 8080)
     --sync-wave WAVE         ArgoCD sync wave (default: 10)
     --language LANG          Application language (generic|node|python|go|java)
+    --profile PROFILE        Infrastructure profile: local, aws (default: local)
     --with-database          Include database configuration
     --with-cache             Include Redis cache configuration  
     --with-queue             Include queue (ElasticMQ) configuration
@@ -75,8 +79,9 @@ Options:
 
 Examples:
     $0 my-api --team backend --port 3000 --with-database --with-terraform
-    $0 my-frontend --team frontend --language node --port 3000
-    $0 my-worker --team backend --with-queue --sync-wave 20 --with-terraform
+    $0 my-api --team backend --profile aws --with-database --with-terraform
+    $0 my-frontend --team frontend --language node --port 3000 --profile local
+    $0 my-worker --team backend --with-queue --sync-wave 20 --with-terraform --profile aws
 EOF
 }
 
@@ -93,6 +98,7 @@ while [[ $# -gt 1 ]]; do
         --port) PORT="$3"; shift 2 ;;
         --sync-wave) SYNC_WAVE="$3"; shift 2 ;;
         --language) LANGUAGE="$3"; shift 2 ;;
+        --profile) PROFILE="$3"; shift 2 ;;
         --with-database) DATABASE=true; shift ;;
         --with-cache) CACHE=true; shift ;;
         --with-queue) QUEUE=true; shift ;;
@@ -119,8 +125,14 @@ if [[ -d "$APP_DIR" ]]; then
     exit 1
 fi
 
+# Validate profile parameter
+if [[ "$PROFILE" != "local" && "$PROFILE" != "aws" ]]; then
+    error "Invalid profile: $PROFILE. Must be 'local' or 'aws'"
+    exit 1
+fi
+
 log "Creating new application: $APP_NAME"
-log "Team: $TEAM, Port: $PORT, Language: $LANGUAGE"
+log "Team: $TEAM, Port: $PORT, Language: $LANGUAGE, Profile: $PROFILE"
 if [[ "$WITH_TERRAFORM" == "true" ]]; then
     log "Features: Database=$DATABASE, Cache=$CACHE, Queue=$QUEUE, Terraform=enabled"
 else
@@ -161,6 +173,7 @@ create_terraform_config() {
     # Generate main.tf with app_skel module
     cat > "$terraform_file" << TF_EOF
 # Terraform configuration for ${APP_NAME} application infrastructure
+# Profile-agnostic configuration - use with tf.sh script to specify profile
 
 terraform {
   required_version = ">= 1.0"
@@ -174,33 +187,26 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.11"
     }
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    digitalocean = {
+      source  = "digitalocean/digitalocean"
+      version = "~> 2.0"
+    }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.4"
+    }
   }
 }
 
-# Configure providers for local k3d cluster
-provider "kubernetes" {
-  config_path    = "~/.kube/config"
-  config_context = "k3d-comind-ops-dev"
-}
+# Note: Provider configurations are handled by tf.sh script based on selected profile
+# For local profile: Uses k3d cluster context and mock AWS credentials
+# For AWS profile: Uses real AWS credentials and EKS cluster context
 
-# AWS provider (required by modules but not used in local environment)
-provider "aws" {
-  region                      = "us-east-1"
-  skip_credentials_validation = true
-  skip_requesting_account_id  = true
-  skip_metadata_api_check     = true
-  access_key                  = "mock"
-  secret_key                  = "mock"
-}
-
-provider "helm" {
-  kubernetes {
-    config_path    = "~/.kube/config"
-    config_context = "k3d-comind-ops-dev"
-  }
-}
-
-# Development environment
+# Development environment module
 module "${APP_NAME}_dev" {
   source = "../../../../infra/terraform/modules/app_skel"
   
@@ -208,7 +214,7 @@ module "${APP_NAME}_dev" {
   app_name     = "${APP_NAME}"
   environment  = "dev"
   team         = "${TEAM}"
-  cluster_type = "local"
+  cluster_type = var.cluster_type
   
   # Database configuration
   database = {
@@ -263,9 +269,9 @@ module "${APP_NAME}_dev" {
   # Monitoring configuration
   monitoring = {
     enabled            = true
-    prometheus_enabled = false  # Disabled for local - no Prometheus operator installed
-    grafana_enabled    = false  # Disabled for local
-    alerting_enabled   = false
+    prometheus_enabled = var.cluster_type == "aws"  # Only enabled for AWS (has Prometheus operator)
+    grafana_enabled    = var.cluster_type == "aws"  # Only enabled for AWS
+    alerting_enabled   = var.cluster_type == "aws"  # Only enabled for AWS
   }
   
   # Security configuration
@@ -294,12 +300,19 @@ module "${APP_NAME}_dev" {
   }
 }
 
+# Variables
+variable "cluster_type" {
+  description = "Type of cluster (local or aws)"
+  type        = string
+  default     = "${PROFILE}"
+}
+
 # Outputs
 output "${APP_NAME}_dev_info" {
   description = "${APP_NAME} development environment information"
   value = {
     namespace        = module.${APP_NAME}_dev.namespace
-    app_url          = "http://${APP_NAME}.dev.127.0.0.1.nip.io:${PORT}"
+    app_url          = var.cluster_type == "local" ? "http://${APP_NAME}.dev.127.0.0.1.nip.io:${PORT}" : "https://${APP_NAME}.dev.your-domain.com"
     enabled_features = module.${APP_NAME}_dev.enabled_features
   }
 }
@@ -312,27 +325,46 @@ output "${APP_NAME}_connection_strings" {
 TF_EOF
 
     # Generate README for the Terraform configuration
-    cat > "${terraform_dir}/README.md" << 'README_EOF'
+    cat > "${terraform_dir}/README.md" << README_EOF
 # ${APP_NAME} Infrastructure
 
 Terraform configuration for provisioning infrastructure for the ${APP_NAME} application.
+Generated for profile: **${PROFILE}** (can be changed at runtime)
 
 ## Usage
 
-```bash
-# Initialize and apply
-cd k8s/apps/${APP_NAME}/terraform
-terraform init
-terraform plan
-terraform apply
+### Local Development (k3d)
+\`\`\`bash
+# Using make commands (recommended)
+make tf-init-app APP=${APP_NAME}
+make tf-apply-app APP=${APP_NAME} PROFILE=local
+
+# Or using tf.sh directly
+./scripts/tf.sh dev ${APP_NAME} init --profile local
+./scripts/tf.sh dev ${APP_NAME} apply --profile local
 
 # Get application information
-terraform output ${APP_NAME}_dev_info
-```
+make tf-output APP=${APP_NAME} PROFILE=local
+\`\`\`
 
-## Access
+### AWS Production (EKS)
+\`\`\`bash
+# Using make commands (recommended)
+make tf-init-app APP=${APP_NAME} PROFILE=aws
+make tf-apply-app APP=${APP_NAME} PROFILE=aws
 
-- **Application URL**: http://${APP_NAME}.dev.127.0.0.1.nip.io:${PORT}
+# Or using tf.sh directly
+./scripts/tf.sh dev ${APP_NAME} init --profile aws
+./scripts/tf.sh dev ${APP_NAME} apply --profile aws
+
+# Get application information
+make tf-output APP=${APP_NAME} PROFILE=aws
+\`\`\`
+
+## Access URLs
+
+- **Local**: http://${APP_NAME}.dev.127.0.0.1.nip.io:${PORT}
+- **AWS**: https://${APP_NAME}.dev.your-domain.com
 
 ## Features
 
@@ -341,6 +373,14 @@ This configuration provisions:
 - Resource quotas and limits
 - Network policies for security
 - Integration with platform services
+- Profile-specific monitoring (Prometheus for AWS only)
+
+## Generated Configuration
+
+- **Team**: ${TEAM}
+- **Language**: ${LANGUAGE}
+- **Default Profile**: ${PROFILE}
+- **Features**: Database=${DATABASE}, Cache=${CACHE}, Queue=${QUEUE}
 README_EOF
 
     success "✅ Terraform configuration created at $terraform_dir"

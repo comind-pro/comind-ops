@@ -5,9 +5,9 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: {{ include "sample-app.fullname" $ }}-{{ .name }}
+  name: {{ include "monitoring-dashboard.fullname" $ }}-{{ .name }}
   labels:
-    {{- include "sample-app.labels" $ | nindent 4 }}
+    {{- include "monitoring-dashboard.labels" $ | nindent 4 }}
     app.kubernetes.io/component: {{ .name }}
   annotations:
     argocd.argoproj.io/sync-wave: "30"
@@ -17,7 +17,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "sample-app.selectorLabels" $ | nindent 8 }}
+        {{- include "monitoring-dashboard.selectorLabels" $ | nindent 8 }}
         app.kubernetes.io/component: {{ .name }}
     spec:
       restartPolicy: {{ .restartPolicy | default "OnFailure" }}
@@ -50,7 +50,7 @@ spec:
         - name: {{ $key }}
           valueFrom:
             secretKeyRef:
-              name: {{ include "sample-app.fullname" $ }}-secrets
+              name: {{ include "monitoring-dashboard.fullname" $ }}-secrets
               key: {{ $key }}
         {{- end }}
         {{- end }}

@@ -2,10 +2,10 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "sample-app.fullname" . }}
+  name: {{ include "monitoring-dashboard.fullname" . }}
   namespace: {{ .Values.namespace }}
   labels:
-    {{- include "sample-app.labels" . | nindent 4 }}
+    {{- include "monitoring-dashboard.labels" . | nindent 4 }}
 spec:
   {{- if .Values.podDisruptionBudget.minAvailable }}
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
@@ -15,5 +15,5 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "sample-app.selectorLabels" . | nindent 6 }}
+      {{- include "monitoring-dashboard.selectorLabels" . | nindent 6 }}
 {{- end }}
