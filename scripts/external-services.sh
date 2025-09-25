@@ -377,3 +377,72 @@ case "$COMMAND" in
         exit 1
         ;;
 esac
+
+# Auto-fix PostgreSQL configuration if needed
+fix_postgres_config() {
+    info "Checking PostgreSQL configuration..."
+    
+    if grep -q "log_collector = on" infra/docker/postgres/config/postgresql.conf 2>/dev/null; then
+        info "Fixing PostgreSQL configuration parameter..."
+        sed -i.bak 's/log_collector = on/logging_collector = on/' infra/docker/postgres/config/postgresql.conf
+        success "PostgreSQL configuration fixed"
+    fi
+}
+
+# Enhanced PostgreSQL setup with auto-healing
+setup_postgres() {
+    info "Setting up PostgreSQL with auto-healing..."
+    
+    # Fix configuration if needed
+    if [ -f "infra/docker/postgres/config/postgresql.conf" ]; then
+        if grep -q "log_collector = on" infra/docker/postgres/config/postgresql.conf; then
+            info "Fixing PostgreSQL configuration..."
+            sed -i.bak 's/log_collector = on/logging_collector = on/' infra/docker/postgres/config/postgresql.conf
+            success "PostgreSQL configuration fixed"
+            
+            # Restart PostgreSQL to apply config fix
+            info "Restarting PostgreSQL with fixed configuration..."
+            docker-compose -f infra/docker/docker-compose.yml restart postgres
+            
+            # Wait for PostgreSQL to be healthy
+            info "Waiting for PostgreSQL to be healthy..."
+            local retries=30
+            while [ $retries -gt 0 ]; do
+                if docker-compose -f infra/docker/docker-compose.yml exec postgres pg_isready -U postgres > /dev/null 2>&1; then
+                    success "PostgreSQL is healthy!"
+                    return 0
+                fi
+                sleep 2
+                retries=$((retries-1))
+                info "Waiting for PostgreSQL... ($retries retries left)"
+            done
+            
+            warning "PostgreSQL took longer than expected, but continuing..."
+        fi
+    fi
+}
+
+# Heal command - fix common issues
+heal() {
+    info "🔧 Healing external services..."
+    
+    # Fix PostgreSQL configuration and restart
+    setup_postgres
+    
+    # Restart all services
+    info "Restarting all services..."
+    docker-compose -f infra/docker/docker-compose.yml restart
+    
+    # Wait for services to be ready
+    info "Waiting for services to be ready..."
+    sleep 10
+    
+    success "Service healing completed!"
+}
+
+# Add heal to the case statement
+case "${1:-}" in
+    heal)
+        heal
+        ;;
+esac

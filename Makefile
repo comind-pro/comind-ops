@@ -440,3 +440,10 @@ down: cleanup ## Alias for cleanup
 
 .PHONY: clean
 clean: cleanup ## Alias for cleanup
+# Heal services - fix common issues automatically
+heal-services: ## Fix common service issues automatically
+	@echo "🔧 Healing external services..."
+	@scripts/external-services.sh heal
+	@echo "✅ Service healing completed"
+
+.PHONY: heal-services
