@@ -48,24 +48,71 @@ help: ## Show this help message
 # ===========================================
 
 .PHONY: bootstrap
-bootstrap: ## Complete cluster setup (core infrastructure + platform services) 
+bootstrap: ## Complete cluster setup (core infrastructure + platform services)
 	@echo "$(BLUE)🏗️  Bootstrapping Comind-Ops Platform...$(NC)"
-	@echo "$(YELLOW)Step 1/6: Checking dependencies...$(NC)"
+	@echo "$(YELLOW)Step 1/7: Checking dependencies...$(NC)"
 	@./scripts/check-deps.sh
-	@echo "$(YELLOW)Step 2/6: Initializing Terraform...$(NC)"
+	@echo "$(YELLOW)Step 2/7: Starting external services...$(NC)"
+	@$(MAKE) --no-print-directory services-setup
+	@echo "$(YELLOW)Step 3/7: Initializing Terraform...$(NC)"
 	@terraform -chdir=infra/terraform/core init
-	@echo "$(YELLOW)Step 3/6: Deploying core infrastructure...$(NC)"
+	@echo "$(YELLOW)Step 4/7: Deploying core infrastructure...$(NC)"
 	@./scripts/tf.sh $(ENV) core apply --auto-approve
-	@echo "$(YELLOW)Step 4/6: Waiting for cluster to be ready...$(NC)"
+	@echo "$(YELLOW)Step 5/7: Waiting for cluster to be ready...$(NC)"
 	@sleep 30
 	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || echo "ArgoCD still starting..."
-	@echo "$(YELLOW)Step 5/6: Applying base Kubernetes resources...$(NC)"
+	@echo "$(YELLOW)Step 6/7: Applying base Kubernetes resources...$(NC)"
 	@kubectl apply -k k8s/base/
-	@echo "$(YELLOW)Step 6/6: Deploying platform services...$(NC)"
+	@echo "$(YELLOW)Step 7/7: Deploying platform services...$(NC)"
 	@kubectl apply -k k8s/platform/
 	@echo "$(GREEN)✅ Bootstrap complete!$(NC)"
 	@echo ""
 	@$(MAKE) --no-print-directory status
+
+# ===========================================
+# 🐳 EXTERNAL SERVICES (PostgreSQL, MinIO)
+# ===========================================
+
+.PHONY: services-start
+services-start: ## Start external services (PostgreSQL, MinIO)
+	@echo "$(BLUE)🐳 Starting external services...$(NC)"
+	@./scripts/external-services.sh start --env $(ENV)
+	@echo "$(GREEN)✅ External services started$(NC)"
+
+.PHONY: services-stop
+services-stop: ## Stop external services
+	@echo "$(BLUE)🛑 Stopping external services...$(NC)"
+	@./scripts/external-services.sh stop --env $(ENV)
+	@echo "$(GREEN)✅ External services stopped$(NC)"
+
+.PHONY: services-status
+services-status: ## Check external services status
+	@echo "$(BLUE)📊 Checking external services status...$(NC)"
+	@./scripts/external-services.sh status --env $(ENV)
+
+.PHONY: services-logs
+services-logs: ## Show external services logs
+	@echo "$(BLUE)📋 Showing external services logs...$(NC)"
+	@./scripts/external-services.sh logs --follow --env $(ENV)
+
+.PHONY: services-backup
+services-backup: ## Backup external services data
+	@echo "$(BLUE)💾 Creating backup of external services...$(NC)"
+	@./scripts/external-services.sh backup --env $(ENV)
+	@echo "$(GREEN)✅ Backup completed$(NC)"
+
+.PHONY: services-setup
+services-setup: ## Setup and initialize external services
+	@echo "$(BLUE)🔧 Setting up external services...$(NC)"
+	@./scripts/external-services.sh setup --env $(ENV)
+	@echo "$(GREEN)✅ External services setup completed$(NC)"
+
+.PHONY: services-clean
+services-clean: ## Clean external services and data (DESTRUCTIVE)
+	@echo "$(RED)⚠️  WARNING: This will delete all external service data!$(NC)"
+	@read -p "Are you sure? (yes/no): " confirm && [ "$$confirm" = "yes" ]
+	@./scripts/external-services.sh clean --env $(ENV)
+	@echo "$(GREEN)✅ External services cleaned$(NC)"
 
 .PHONY: cleanup
 cleanup: ## Destroy cluster and cleanup resources (⚠️  DESTRUCTIVE)
@@ -244,6 +291,9 @@ deploy: ## Deploy all platform services and applications
 status: ## Show overall platform status
 	@echo "$(BLUE)📊 comind-ops Platform Status$(NC)"
 	@echo ""
+	@echo "$(GREEN)External Services:$(NC)"
+	@$(MAKE) --no-print-directory services-status
+	@echo ""
 	@echo "$(GREEN)Cluster Information:$(NC)"
 	@kubectl cluster-info --context k3d-comind-ops-dev | head -2
 	@echo ""
@@ -255,6 +305,8 @@ status: ## Show overall platform status
 	@echo ""
 	@echo "$(GREEN)Quick Access:$(NC)"
 	@echo "• ArgoCD UI: http://argocd.$(ENV).127.0.0.1.nip.io:8080"
+	@echo "• MinIO Console: http://localhost:9001"
+	@echo "• PostgreSQL: localhost:5432"
 	@echo "• ElasticMQ: http://elasticmq.$(ENV).127.0.0.1.nip.io:8080"
 	@echo "• Registry: http://registry.$(ENV).127.0.0.1.nip.io:8080"
 

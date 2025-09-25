@@ -32,10 +32,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/comind-ops-cloud-setup"
+    "url": "https://github.com/comind-pro/comind-ops"
   },
   "bugs": {
-    "url": "https://github.com/your-org/comind-ops-cloud-setup/issues"
+    "url": "https://github.com/comind-pro/comind-ops/issues"
   },
-  "homepage": "https://github.com/your-org/comind-ops-cloud-setup#readme"
+  "homepage": "https://github.com/comind-pro/comind-ops#readme"
 }

@@ -251,12 +251,14 @@ configMap:
 
 # Platform service integrations
 platformServices:
-  # Database integration (PostgreSQL)
+  # Database integration (External PostgreSQL Container)
   database:
     enabled: true
-    host: postgres.platform-dev.svc.cluster.local
+    host: sample-app-postgres-external
+    externalHost: 172.20.0.10  # Docker container IP
     port: 5432
-    name: sampleapp
+    name: sample_app_dev
+    user: sample_app_user
     pool:
       min: 2
       max: 10
@@ -279,10 +281,12 @@ platformServices:
       - notifications
       - high-priority
 
-  # Storage integration (MinIO)
+  # Storage integration (External MinIO Container)
   storage:
     enabled: true
-    endpoint: minio.platform-dev.svc.cluster.local:9000
+    endpoint: sample-app-minio-external:9000
+    externalHost: 172.20.0.20  # Docker container IP
+    externalEndpoint: localhost:9000  # External access
     secure: false
     buckets:
       - sample-app-uploads

@@ -39,7 +39,7 @@ configs:
 
       # Repository configuration
       repositories: |
-        - url: https://github.com/your-org/comind-ops-cloud-setup
+        - url: https://github.com/comind-pro/comind-ops
           name: comind-ops-platform
           type: git
 

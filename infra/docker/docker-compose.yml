@@ -1,0 +1,224 @@
+version: '3.8'
+
+# Comind-Ops Platform - External Services
+# PostgreSQL and MinIO running as separate containers outside Kubernetes
+# This provides better data persistence and easier management
+
+networks:
+  comind-ops-network:
+    name: comind-ops-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres-data:
+    name: comind-ops-postgres-data
+    driver: local
+  minio-data:
+    name: comind-ops-minio-data
+    driver: local
+  minio-config:
+    name: comind-ops-minio-config
+    driver: local
+
+services:
+  # ===========================================
+  # PostgreSQL Database
+  # ===========================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: comind-ops-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: comind_ops
+      POSTGRES_USER: comind_ops_user
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_change_me}
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+      - ./postgres/config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    ports:
+      - "5432:5432"
+    networks:
+      comind-ops-network:
+        ipv4_address: 172.20.0.10
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U comind_ops_user -d comind_ops"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "com.comind-ops.service=database"
+      - "com.comind-ops.env=${ENV:-dev}"
+      - "com.comind-ops.version=16"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+      -c log_destination=stderr
+      -c log_statement=mod
+      -c log_min_duration_statement=1000
+
+  # ===========================================
+  # MinIO Object Storage
+  # ===========================================
+  minio:
+    image: minio/minio:latest
+    container_name: comind-ops-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
+      MINIO_SERVER_URL: http://localhost:9000
+      MINIO_CONSOLE_ADDRESS: ":9001"
+    volumes:
+      - minio-data:/data
+      - minio-config:/root/.minio
+    ports:
+      - "9000:9000"  # MinIO API
+      - "9001:9001"  # MinIO Console
+    networks:
+      comind-ops-network:
+        ipv4_address: 172.20.0.20
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    labels:
+      - "com.comind-ops.service=storage"
+      - "com.comind-ops.env=${ENV:-dev}"
+      - "com.comind-ops.version=latest"
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "3"
+    command: server /data --console-address ":9001"
+
+  # ===========================================
+  # MinIO Client (for bucket initialization)
+  # ===========================================
+  minio-init:
+    image: minio/mc:latest
+    container_name: comind-ops-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    networks:
+      - comind-ops-network
+    labels:
+      - "com.comind-ops.service=storage-init"
+      - "com.comind-ops.env=${ENV:-dev}"
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO to be ready...';
+      sleep 10;
+      
+      echo 'Configuring MinIO client...';
+      mc alias set minio http://comind-ops-minio:9000 $$MINIO_ROOT_USER $$MINIO_ROOT_PASSWORD;
+      
+      echo 'Creating default buckets...';
+      mc mb --ignore-existing minio/app-data;
+      mc mb --ignore-existing minio/backups;
+      mc mb --ignore-existing minio/logs;
+      mc mb --ignore-existing minio/uploads;
+      mc mb --ignore-existing minio/artifacts;
+      
+      echo 'Setting bucket policies...';
+      mc anonymous set download minio/uploads;
+      mc anonymous set none minio/backups;
+      
+      echo 'Creating lifecycle policies...';
+      cat > /tmp/backup-lifecycle.json << EOF
+      {
+        \"Rules\": [
+          {
+            \"ID\": \"backup-retention\",
+            \"Status\": \"Enabled\",
+            \"Expiration\": {
+              \"Days\": 30
+            }
+          }
+        ]
+      }
+      EOF
+      mc ilm set /tmp/backup-lifecycle.json minio/backups;
+      
+      echo 'MinIO initialization completed successfully';
+      "
+
+  # ===========================================
+  # PostgreSQL Backup Service
+  # ===========================================
+  postgres-backup:
+    image: postgres:16-alpine
+    container_name: comind-ops-postgres-backup
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      PGHOST: comind-ops-postgres
+      PGPORT: 5432
+      PGDATABASE: comind_ops
+      PGUSER: comind_ops_user
+      PGPASSWORD: ${POSTGRES_PASSWORD:-secure_password_change_me}
+      MINIO_ENDPOINT: comind-ops-minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      BACKUP_RETENTION_DAYS: 7
+    volumes:
+      - ./scripts/backup-postgres.sh:/backup-postgres.sh:ro
+    networks:
+      - comind-ops-network
+    labels:
+      - "com.comind-ops.service=backup"
+      - "com.comind-ops.type=postgres"
+      - "com.comind-ops.env=${ENV:-dev}"
+    profiles:
+      - backup
+    entrypoint: ["/backup-postgres.sh"]
+
+  # ===========================================
+  # MinIO Backup Service
+  # ===========================================
+  minio-backup:
+    image: minio/mc:latest
+    container_name: comind-ops-minio-backup
+    restart: "no"
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      SOURCE_MINIO_ENDPOINT: comind-ops-minio:9000
+      SOURCE_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      SOURCE_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      BACKUP_RETENTION_DAYS: 7
+    volumes:
+      - ./scripts/backup-minio.sh:/backup-minio.sh:ro
+    networks:
+      - comind-ops-network
+    labels:
+      - "com.comind-ops.service=backup"
+      - "com.comind-ops.type=minio"
+      - "com.comind-ops.env=${ENV:-dev}"
+    profiles:
+      - backup
+    entrypoint: ["/backup-minio.sh"]

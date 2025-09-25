@@ -116,7 +116,7 @@ Update the repository URL in the ApplicationSet files to point to your Git repos
 
 ```yaml
 # In argo/apps/applicationset.yaml
-repoURL: https://github.com/YOUR-ORG/comind-ops-cloud-setup
+repoURL: https://github.com/comind-pro/comind-ops
 ```
 
 ## Adding New Applications
@@ -166,7 +166,7 @@ Private repositories require secrets:
 ```bash
 # Create repository secret
 kubectl create secret generic repo-credentials \
-  --from-literal=url=https://github.com/your-org/repo \
+  --from-literal=url=https://github.com/comind-pro/repo \
   --from-literal=username=token \
   --from-literal=password=<github-token> \
   -n argocd

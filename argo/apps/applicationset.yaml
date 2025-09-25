@@ -16,7 +16,7 @@ spec:
         generators:
         # Git files generator - reads apps.yaml from the repository
         - git:
-            repoURL: https://github.com/your-org/comind-ops-cloud-setup
+            repoURL: https://github.com/comind-pro/comind-ops
             revision: HEAD
             files:
             - path: apps.yaml
@@ -59,7 +59,7 @@ spec:
 
         # Source configuration
         source:
-          repoURL: https://github.com/your-org/comind-ops-cloud-setup
+          repoURL: https://github.com/comind-pro/comind-ops
           targetRevision: HEAD
           path: '{{apps.path}}'
 
@@ -183,7 +183,7 @@ spec:
         project: default
 
         source:
-          repoURL: https://github.com/your-org/comind-ops-cloud-setup
+          repoURL: https://github.com/comind-pro/comind-ops
           targetRevision: HEAD
           path: '{{path}}'
 
@@ -229,7 +229,7 @@ spec:
     project: default
 
     source:
-      repoURL: https://github.com/your-org/comind-ops-cloud-setup
+      repoURL: https://github.com/comind-pro/comind-ops
       targetRevision: HEAD
       path: argo/apps
 
@@ -249,4 +249,4 @@ spec:
     - name: Description
       value: "Root application that manages all ApplicationSets for the comind-ops platform"
     - name: Documentation
-      value: "https://github.com/your-org/comind-ops-cloud-setup/blob/main/docs/README.md"
+      value: "https://github.com/comind-pro/comind-ops/blob/main/docs/README.md"

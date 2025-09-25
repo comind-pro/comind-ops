@@ -46,8 +46,8 @@ LABEL name="comind-ops/sample-app"
 LABEL version="1.0.0"
 LABEL description="Sample application demonstrating Comind-Ops Platform capabilities"
 LABEL maintainer="Comind-Ops Platform Team <platform@comind-ops.io>"
-LABEL org.opencontainers.image.source="https://github.com/your-org/comind-ops-cloud-setup"
-LABEL org.opencontainers.image.documentation="https://github.com/your-org/comind-ops-cloud-setup/blob/main/k8s/apps/sample-app/README.md"
+LABEL org.opencontainers.image.source="https://github.com/comind-pro/comind-ops"
+LABEL org.opencontainers.image.documentation="https://github.com/comind-pro/comind-ops/blob/main/k8s/apps/sample-app/README.md"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Install security updates and required packages

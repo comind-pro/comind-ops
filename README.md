@@ -9,7 +9,7 @@ Complete cloud-native platform built on Kubernetes, featuring automated GitOps w
 - **🔒 Enterprise Security**: Sealed secrets, RBAC, network policies, and Pod Security Standards
 - **📊 Complete Observability**: Prometheus monitoring, centralized logging, and health checks
 - **🛠️ Developer Experience**: One-command app scaffolding, automated infrastructure provisioning
-- **📦 Platform Services**: PostgreSQL, MinIO, Redis, ElasticMQ, Docker Registry with automated backups
+- **📦 External Data Services**: PostgreSQL and MinIO running as optimized Docker containers
 - **🎯 Production Ready**: High availability, disaster recovery, security scanning, and compliance
 
 ---
@@ -18,14 +18,16 @@ Complete cloud-native platform built on Kubernetes, featuring automated GitOps w
 
 ```bash
 # 1. Clone the repository
-git clone git@github.com:comind-pro/comind-ops.git
+git clone https://github.com/comind-pro/comind-ops.git
 cd comind-ops
 
 # 2. Bootstrap the platform (one command setup!)
 make bootstrap
 
-# 3. Access ArgoCD dashboard
-make argo-login
+# 3. Access services
+make argo-login                    # ArgoCD dashboard
+make services-status               # Check external services
+open http://localhost:9001         # MinIO console
 
 # 4. Create your first application with infrastructure
 make new-app-full APP=my-api TEAM=backend
@@ -44,24 +46,36 @@ make tf-apply-app APP=my-api
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
 │  │   DEVELOPMENT   │  │     STAGING     │  │   PRODUCTION    │  │
 │  │                 │  │                 │  │                 │  │
-│  │ • Local k3d     │  │ • AWS/DO K8s    │  │ • AWS/DO K8s    │  │
-│  │ • Fast iteration│  │ • Prod-like     │  │ • High-available│  │
-│  │ • Debug friendly│  │ • Performance   │  │ • Disaster recovery│ │
+│  │ • Local k3d     │  │ • AWS/DO Cloud  │  │ • AWS/DO Cloud  │  │
+│  │ • Auto Deploy   │  │ • Tag Deploy    │  │ • Manual Approval│  │
+│  │ • Debug Mode    │  │ • Prod-like     │  │ • Blue/Green    │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────────┐ │
-│  │                    PLATFORM SERVICES                        │ │
+│  │                    KUBERNETES CLUSTER                       │ │
 │  │                                                             │ │
-│  │ ArgoCD • Sealed Secrets • Ingress • MetalLB • Prometheus   │ │
-│  │ PostgreSQL • MinIO • Redis • ElasticMQ • Docker Registry   │ │
+│  │ ArgoCD • Sealed Secrets • Ingress • MetalLB • ElasticMQ    │ │
+│  │ Applications • Platform Services • Monitoring • Security    │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │              EXTERNAL DATA SERVICES (infra/docker)          │ │
+│  │                                                             │ │
+│  │  ┌─────────────────┐            ┌─────────────────────────┐ │ │
+│  │  │   PostgreSQL    │◀──────────▶│         MinIO          │ │ │
+│  │  │   (port 5432)   │            │  (ports 9000/9001)     │ │ │
+│  │  │ • Multi-DB      │            │ • S3 Compatible        │ │ │
+│  │  │ • Automated     │            │ • Web Console          │ │ │
+│  │  │   Backups       │            │ • Lifecycle Policies   │ │ │
+│  │  └─────────────────┘            └─────────────────────────┘ │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 │                                                                 │
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
 │  │   AUTOMATION    │  │    SECURITY     │  │   OBSERVABILITY │  │
 │  │                 │  │                 │  │                 │  │
 │  │ • Terraform     │  │ • RBAC          │  │ • Metrics       │  │
-│  │ • Helm Charts   │  │ • Network Policies│ │ • Logs          │  │
-│  │ • Scripts       │  │ • Pod Security  │  │ • Tracing       │  │
+│  │ • Helm Charts   │  │ • Network Pol.  │  │ • Logs          │  │
+│  │ • Scripts       │  │ • Pod Security  │  │ • Health Checks │  │
 │  │ • CI/CD         │  │ • Secrets Mgmt  │  │ • Alerting      │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
 │                                                                 │
@@ -70,196 +84,254 @@ make tf-apply-app APP=my-api
 
 ## 🛠 Technologies
 
-* **Terraform**: Infrastructure provisioning (clusters, networks, databases, registry).
-* **Docker**: Local base services (Postgres, MinIO).
-* **Kubernetes**: k3d/kind locally; EKS/DigitalOcean in the cloud.
-* **Helm**: Deploy core services (ingress-nginx, Argo CD, cert-manager, sealed-secrets, monitoring stack).
-* **Argo CD + ApplicationSet**: GitOps engine for apps and infrastructure.
-* **Sealed Secrets**: Git-based encrypted secrets.
-* **ElasticMQ**: SQS-compatible queue service.
-* **MinIO**: S3-compatible object storage.
-* **Postgres**: Relational database.
-* **Docker Registry (distribution v2)**: Private container registry with retention policies.
-* **regclient/regctl** or **crane**: Tools for registry cleanup automation.
-* **Makefile + scripts**: Developer-friendly automation.
+**Infrastructure & Platform:**
+- **Kubernetes**: k3d locally, AWS EKS/DigitalOcean in cloud
+- **Terraform**: Infrastructure as code for all environments
+- **ArgoCD**: GitOps continuous deployment and application management
+- **Helm**: Package management for Kubernetes applications
+
+**External Data Services:**
+- **PostgreSQL 16**: Primary database with multi-environment support
+- **MinIO**: S3-compatible object storage with web console
+- **Automated Backups**: Scheduled backups to MinIO with retention policies
+
+**Platform Services:**
+- **ElasticMQ**: SQS-compatible message queue
+- **Docker Registry**: Private container registry with cleanup automation
+- **Sealed Secrets**: Secure secret management for GitOps
+- **MetalLB**: Load balancer for local development
+- **Ingress-Nginx**: HTTP/HTTPS ingress controller
+
+**Security & Governance:**
+- **RBAC**: Role-based access control throughout the platform
+- **Network Policies**: Microsegmentation and traffic control
+- **Pod Security Standards**: Enforce security best practices
+- **Resource Quotas**: Prevent resource exhaustion
 
 ---
 
-## 📂 Repository Structure
+## 🚀 Platform Operations
 
-```
-cloud-setup/
-  docs/
-    infra-architecture.md
-    secrets.md
-    onboarding.md
-  apps.yaml
-  infra/
-    terraform/
-      core/               # cluster creation, ingress, Argo, sealed-secrets, metallb
-      modules/
-        app_skel/
-      states/             # local tfstate (ignored in git)
-      envs/
-        dev/platform/     # platform apps (redis, elasticmq, registry)
-        stage/platform/
-        prod/platform/
-  k8s/
-    base/                 # namespaces, quotas, policies
-    platform/
-      elasticmq/
-      registry/
-      backups/
-    apps/
-      <app-name>/
-        chart/
-        values/{dev,stage,prod}.yaml
-        secrets/{dev,stage,prod}.sealed.yaml
-        terraform/
-  argo/
-    argocd/install/
-    apps/applicationset.yaml
-  scripts/
-    new-app.sh
-    seal-secret.sh
-    tf.sh
-  .gitignore
-  Makefile
+### **🏗️ Infrastructure Management**
+
+```bash
+# Complete platform setup
+make bootstrap                     # Full platform bootstrap
+
+# External services management  
+make services-start               # Start PostgreSQL & MinIO
+make services-stop                # Stop external services
+make services-status              # Check service health
+make services-backup              # Create backups
+
+# Kubernetes cluster operations
+make validate                     # Validate all configurations
+make deploy                       # Deploy platform services
+make status                       # Platform status overview
 ```
 
----
+### **🔧 Application Development**
 
-## 🚀 Scenarios
+```bash
+# Create new applications
+make new-app-full APP=my-service TEAM=backend    # Full-stack app with DB
+make new-app-api APP=my-api TEAM=backend         # API service
+make new-app-worker APP=worker TEAM=data        # Background worker
 
-### Local Development (Docker + k3d)
+# Infrastructure provisioning
+make tf-plan-app APP=my-service                  # Plan infrastructure
+make tf-apply-app APP=my-service                 # Deploy infrastructure
+make tf-destroy-app APP=my-service               # Clean up infrastructure
 
-* Terraform provisions k3d cluster, Postgres & MinIO in Docker, installs ingress-nginx, Argo CD, sealed-secrets.
-* Argo CD applies ApplicationSet from `apps.yaml`.
-* Platform services (ElasticMQ, Registry, Backup CronJobs) deployed as platform apps.
-* External access via **nip.io/sslip.io** ingress.
+# Secret management
+make seal-secret APP=my-service ENV=dev FILE=secrets.yaml
+```
 
-### Cloud Deployment (AWS / DigitalOcean)
+### **🧪 Testing & Validation**
 
-* Terraform provisions EKS/DO Kubernetes, VPC, subnets, SG, RDS/Postgres, S3/MinIO.
-* Helm releases install ingress-nginx, Argo CD, sealed-secrets.
-* Argo CD deploys apps with same GitOps workflow.
-* DNS managed via Route53/DO, secrets managed with SealedSecrets.
+```bash
+# Comprehensive testing
+make test                         # Run all tests
+make test-unit                    # Unit tests only
+make test-integration            # Integration tests
+make test-e2e                    # End-to-end tests
+make test-performance            # Performance tests
 
----
+# Component-specific testing
+make test-helm                   # Test Helm charts
+make test-terraform              # Test Terraform modules
+make test-ci                     # Test CI/CD components
+```
 
-## 🔒 Secrets Management
+## 📦 External Services Architecture
 
-* **Sealed Secrets** encrypts Kubernetes Secrets.
-* Only encrypted `*.sealed.yaml` stored in git.
-* Workflow:
+The Comind-Ops Platform uses external Docker containers for data services, providing better persistence and management:
 
-  1. Create a plain Secret locally.
-  2. Encrypt with `kubeseal` into `.sealed.yaml`.
-  3. Commit `.sealed.yaml`.
-* Argo CD syncs and decrypts secrets into the cluster.
+### PostgreSQL Database
+- **Access**: `localhost:5432`
+- **Databases**: Multi-environment setup (dev, stage, prod)
+- **Features**: Optimized configuration, automated backups, health monitoring
+- **Management**: `make services-*` commands
 
----
+### MinIO Object Storage  
+- **API**: `http://localhost:9000`
+- **Console**: `http://localhost:9001`
+- **Features**: S3-compatible, lifecycle policies, bucket management
+- **Buckets**: app-data, backups, logs, uploads, artifacts
 
-## 🌐 Namespaces & Platform Services
-
-* Each app runs in its own namespace: `myapp-dev`, `myapp-stage`, `myapp-prod`.
-* Platform services deployed per environment in `platform-<env>` namespace:
-
-  * **ElasticMQ** (SQS-compatible queue).
-  * **Local Docker Registry**.
-  * **CronJobs** for Postgres & MinIO backups.
-
----
-
-## 🌀 Adding a New Application
-
-1. **Scaffold:**
-
-   ```bash
-   ./scripts/new-app.sh video-api
-   ```
-
-   Creates `k8s/apps/video-api/...`.
-
-2. **Register in apps.yaml:**
-
-   ```yaml
-   apps:
-     - name: video-api
-       path: k8s/apps/video-api/chart
-       namespace: video-api
-       helm:
-         values:
-           - k8s/apps/video-api/values/{{env}}.yaml
-           - k8s/apps/video-api/secrets/{{env}}.sealed.yaml
-   ```
-
-3. **Secrets:**
-
-   ```bash
-   kubectl create secret generic db-creds --from-literal=PASSWORD=123 --dry-run=client -o yaml > secret.yaml
-   ./scripts/seal-secret.sh video-api dev secret.yaml
-   git add k8s/apps/video-api/secrets/dev.sealed.yaml
-   git commit -m "add secrets for video-api"
-   ```
-
-4. **Terraform for app (optional):**
-
-   ```bash
-   ./scripts/tf.sh dev video-api
-   ```
-
-5. Argo CD syncs → Application ready and exposed via Ingress.
+### Benefits
+- ✅ **Data Persistence**: Survives cluster recreation
+- ✅ **Performance**: Reduced Kubernetes overhead
+- ✅ **Management**: Direct access for debugging and administration
+- ✅ **Backup**: Integrated automated backup solution
 
 ---
 
-## 🔁 Automated Backups
+## 🔒 Security Features
 
-* **Postgres CronJob**: Runs `pg_dumpall`, compresses, uploads to MinIO.
-* **MinIO CronJob**: Mirrors production buckets into timestamped backup prefixes.
-* Retention handled by lifecycle rules or cleanup jobs.
+### **Secrets Management**
+- **Sealed Secrets**: Encrypt secrets for safe Git storage
+- **Secret Rotation**: Automated credential lifecycle management
+- **Scope Isolation**: Namespace and environment-specific secrets
 
----
+### **Network Security**
+- **Network Policies**: Default-deny with explicit allow rules
+- **Pod Security**: Enforce security standards across all workloads
+- **RBAC**: Fine-grained authorization throughout the platform
 
-## 📦 Local Docker Registry with Retention
-
-* Deployment of `registry:2` with PVC storage.
-* Ingress exposes registry (e.g., `registry.dev.127.0.0.1.nip.io`).
-* Authentication via htpasswd SealedSecret.
-* Retention CronJob uses `regctl` to delete old tags/images (keep N tags or by age).
-
----
-
-## ✅ CI/CD Workflow
-
-* CI builds/pushes images to registry.
-* CI bumps Helm values (`values/dev.yaml`) with new tags (or use `argocd-image-updater`).
-* Validation jobs:
-
-  * `terraform fmt/validate`.
-  * `helm lint`.
-  * (Optional) `tflint/tfsec`, `kubectl kustomize`.
-* Argo CD applies changes automatically.
+### **Compliance**
+- **Security Scanning**: Automated vulnerability detection
+- **Policy Enforcement**: OPA-based policy validation
+- **Audit Logging**: Comprehensive access and change tracking
 
 ---
 
-## 🧩 Advantages
+## 📊 CI/CD Pipeline
 
-* Unified flow for **local and cloud** environments.
-* GitOps-driven, minimal manual steps.
-* Secrets secure with SealedSecrets.
-* Automated backups for critical stateful services.
-* Local Docker Registry enables CI/CD pipelines without external dependencies.
-* ElasticMQ provides simple, AWS SQS-compatible queue system.
+### **5 Specialized Workflows**
+1. **CI Pipeline**: Validation, linting, security scanning
+2. **CD Pipeline**: Multi-environment deployment automation
+3. **Terraform Pipeline**: Infrastructure change management
+4. **Security Pipeline**: Comprehensive security validation
+5. **Helm Pipeline**: Chart testing and validation
+
+### **Features**
+- ✅ **Multi-environment Promotion**: Dev → Staging → Production
+- ✅ **Security Integration**: 7 security tools across all workflows
+- ✅ **Infrastructure as Code**: Terraform automation with drift detection
+- ✅ **Container Security**: Image scanning and SBOM generation
 
 ---
 
-## 📖 Next Steps
+## 🎯 Getting Started Guide
 
-* Bootstrap cluster with `make bootstrap`.
-* Login to Argo CD with `make argo-login`.
-* Add new apps with `make new-app APP=myapp`.
-* Seal secrets with `make seal APP=myapp ENV=dev FILE=secret.yaml`.
-* Run app Terraform (if any) with `make tf APP=myapp ENV=dev`.
+### **1. Prerequisites**
+```bash
+# Install required tools
+brew install docker kubectl helm terraform k3d yamllint
 
-After that, applications will be available externally via ingress domains.
+# Verify installation
+make check-deps                  # Check all dependencies
+```
+
+### **2. Bootstrap Platform**
+```bash
+# Complete setup
+make bootstrap                   # One command to rule them all!
+
+# Verify installation
+make status                      # Check all components
+```
+
+### **3. Deploy First Application**  
+```bash
+# Create sample application
+make new-app-full APP=hello-world TEAM=platform
+
+# Deploy infrastructure
+make tf-apply-app APP=hello-world
+
+# Check deployment
+kubectl get pods -n hello-world-dev
+```
+
+### **4. Access Services**
+- **ArgoCD**: `http://argocd.dev.127.0.0.1.nip.io:8080`
+- **MinIO Console**: `http://localhost:9001`
+- **PostgreSQL**: `psql -h localhost -p 5432 -U comind_ops_user -d comind_ops`
+
+---
+
+## 📚 Documentation
+
+### **Core Guides**
+- **[Architecture](docs/infra-architecture.md)**: Complete system architecture and design
+- **[Onboarding](docs/onboarding.md)**: Step-by-step developer onboarding
+- **[External Services](docs/external-services.md)**: PostgreSQL and MinIO management
+- **[Secrets Management](docs/secrets.md)**: Secure secret handling workflows
+- **[CI/CD Pipelines](docs/ci-cd.md)**: Automation and deployment workflows
+
+### **Quick References**
+- **[Makefile Targets](Makefile.md)**: All available commands
+- **[Testing Framework](tests/README.md)**: Testing strategies and tools
+
+---
+
+## 🚀 Production Ready Features
+
+### **High Availability**
+- Multi-zone deployment support
+- Automated failover and recovery
+- Load balancing and traffic management
+- Data replication and backup strategies
+
+### **Scalability**  
+- Horizontal pod autoscaling
+- Cluster autoscaling integration
+- Resource optimization and monitoring
+- Performance tuning guidelines
+
+### **Observability**
+- Comprehensive metrics collection
+- Centralized logging aggregation  
+- Distributed tracing capabilities
+- Custom dashboards and alerting
+
+### **Security Hardening**
+- Pod security standards enforcement
+- Network microsegmentation
+- Vulnerability scanning and management
+- Compliance framework integration
+
+---
+
+## 🎊 What's Included
+
+**✅ Complete Platform Stack**
+- Infrastructure automation with Terraform
+- GitOps deployment with ArgoCD  
+- External data services (PostgreSQL, MinIO)
+- Platform services (ElasticMQ, Registry)
+- Security and governance frameworks
+
+**✅ Developer Experience**
+- One-command platform bootstrap
+- Application scaffolding automation
+- Comprehensive testing framework
+- Rich documentation and guides
+
+**✅ Production Operations**
+- Multi-environment support
+- Automated backup and recovery
+- Comprehensive monitoring
+- Security scanning and compliance
+
+**✅ Enterprise Features**  
+- RBAC and access control
+- Secret management workflows
+- Network security policies
+- Audit logging and compliance
+
+---
+
+The **Comind-Ops Platform** provides everything needed to build, deploy, and operate cloud-native applications at enterprise scale! 🚀

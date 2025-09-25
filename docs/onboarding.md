@@ -64,8 +64,8 @@ make version
 ### 1.1 Clone the Repository
 
 ```bash
-git clone https://github.com/your-org/comind-ops-cloud-setup.git
-cd comind-ops-cloud-setup
+git clone https://github.com/comind-pro/comind-ops.git
+cd comind-ops
 ```
 
 ### 1.2 Verify Repository Structure

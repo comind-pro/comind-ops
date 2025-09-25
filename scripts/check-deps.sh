@@ -1,250 +1,248 @@
 #!/bin/bash
 set -euo pipefail
 
-# Comind-Ops Platform - Dependency Checker and Auto-Installer
-# Ensures all required tools are installed and configured
+# Dependency Checker for Comind-Ops Platform
+# Verifies all required tools and services are available
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-log() { echo -e "${BLUE}[INFO]${NC} $1"; }
-success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log() { echo -e "${BLUE}[DEPS]${NC} $1"; }
+success() { echo -e "${GREEN}[OK]${NC} $1"; }
+error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
 warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Detect OS and package manager
-detect_os() {
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-        echo "macos"
-    elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-        if command -v apt-get >/dev/null 2>&1; then
-            echo "ubuntu"
-        elif command -v yum >/dev/null 2>&1; then
-            echo "centos"
-        else
-            echo "linux"
-        fi
+MISSING_DEPS=()
+OPTIONAL_DEPS=()
+
+check_command() {
+    local cmd="$1"
+    local desc="$2"
+    local required="${3:-true}"
+    
+    if command -v "$cmd" &> /dev/null; then
+        local version
+        case "$cmd" in
+            docker)
+                version=$(docker --version | cut -d' ' -f3 | sed 's/,//')
+                ;;
+            kubectl)
+                version=$(kubectl version --client --short 2>/dev/null | cut -d' ' -f3 || echo "unknown")
+                ;;
+            helm)
+                version=$(helm version --short | cut -d' ' -f1 | sed 's/v//')
+                ;;
+            terraform)
+                version=$(terraform version | head -1 | cut -d' ' -f2 | sed 's/v//')
+                ;;
+            yq)
+                version=$(yq --version | cut -d' ' -f4)
+                ;;
+            *)
+                version=$(${cmd} --version 2>/dev/null | head -1 || echo "unknown")
+                ;;
+        esac
+        success "$desc ($version)"
     else
-        echo "unknown"
+        if [[ "$required" == "true" ]]; then
+            error "$desc - REQUIRED"
+            MISSING_DEPS+=("$cmd")
+        else
+            warning "$desc - OPTIONAL"
+            OPTIONAL_DEPS+=("$cmd")
+        fi
     fi
 }
 
-# Install package based on OS
-install_package() {
-    local package="$1"
-    local os="$2"
-    
-    case "$os" in
-        "macos")
-            if ! command -v brew >/dev/null 2>&1; then
-                log "Installing Homebrew..."
-                /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-            fi
-            log "Installing $package via Homebrew..."
-            brew install "$package"
-            ;;
-        "ubuntu")
-            log "Installing $package via apt..."
-            sudo apt-get update && sudo apt-get install -y "$package"
-            ;;
-        "centos")
-            log "Installing $package via yum..."
-            sudo yum install -y "$package"
-            ;;
-        *)
-            error "Unsupported OS. Please install $package manually."
-            exit 1
-            ;;
-    esac
-}
-
-# Check and install Docker
-check_docker() {
-    log "Checking Docker..."
-    
-    if ! command -v docker >/dev/null 2>&1; then
-        error "Docker is not installed. Please install Docker Desktop from https://docker.com/get-started"
-        exit 1
-    fi
+check_external_services() {
+    log "Checking external services..."
     
     # Check if Docker daemon is running
-    if ! docker ps >/dev/null 2>&1; then
-        log "Docker daemon is not running. Starting Docker..."
-        case "$(detect_os)" in
-            "macos")
-                open -a Docker
-                log "Waiting for Docker to start..."
-                local timeout=60
-                while [ $timeout -gt 0 ]; do
-                    if docker ps >/dev/null 2>&1; then
-                        break
-                    fi
-                    sleep 2
-                    timeout=$((timeout - 2))
-                done
-                if [ $timeout -le 0 ]; then
-                    error "Docker failed to start within 60 seconds"
-                    exit 1
-                fi
-                ;;
-            *)
-                sudo systemctl start docker
-                sudo systemctl enable docker
-                ;;
-        esac
+    if docker ps &> /dev/null; then
+        success "Docker daemon is running"
+        
+        # Check if our external services are running
+        if docker ps --format "table {{.Names}}" | grep -q "comind-ops-postgres"; then
+            success "PostgreSQL container is running"
+        else
+            warning "PostgreSQL container not running (use: ./scripts/external-services.sh start)"
+        fi
+        
+        if docker ps --format "table {{.Names}}" | grep -q "comind-ops-minio"; then
+            success "MinIO container is running"
+        else
+            warning "MinIO container not running (use: ./scripts/external-services.sh start)"
+        fi
+    else
+        error "Docker daemon is not running"
+        MISSING_DEPS+=("docker-daemon")
     fi
-    
-    success "✅ Docker is running"
 }
 
-# Check and install k3d
-check_k3d() {
-    log "Checking k3d..."
+check_k8s_cluster() {
+    log "Checking Kubernetes cluster..."
     
-    if ! command -v k3d >/dev/null 2>&1; then
-        log "k3d not found. Installing..."
-        local os="$(detect_os)"
-        case "$os" in
-            "macos")
-                install_package "k3d" "$os"
-                ;;
-            "ubuntu"|"linux")
-                curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
-                ;;
-            *)
-                error "Please install k3d manually from https://k3d.io"
-                exit 1
-                ;;
-        esac
+    if kubectl cluster-info &> /dev/null; then
+        local context
+        context=$(kubectl config current-context)
+        success "Kubernetes cluster accessible (context: $context)"
+        
+        # Check if it's a k3d cluster
+        if [[ "$context" == "k3d-"* ]]; then
+            success "k3d cluster detected"
+        else
+            warning "Non-k3d cluster detected - some features may not work"
+        fi
+    else
+        warning "Kubernetes cluster not accessible (bootstrap will create k3d cluster)"
     fi
-    
-    success "✅ k3d $(k3d version | head -1 | cut -d' ' -f3)"
 }
 
-# Check and install kubectl
-check_kubectl() {
-    log "Checking kubectl..."
+check_network_connectivity() {
+    log "Checking network connectivity..."
     
-    if ! command -v kubectl >/dev/null 2>&1; then
-        log "kubectl not found. Installing..."
-        local os="$(detect_os)"
-        install_package "kubectl" "$os"
+    # Check if we can resolve DNS
+    if nslookup google.com &> /dev/null; then
+        success "DNS resolution working"
+    else
+        error "DNS resolution failed"
+        MISSING_DEPS+=("dns")
     fi
     
-    success "✅ kubectl $(kubectl version --client -o json | jq -r '.clientVersion.gitVersion' 2>/dev/null || echo 'installed')"
+    # Check if we can reach container registries
+    if curl -s --connect-timeout 5 https://registry.hub.docker.com/v2/ &> /dev/null; then
+        success "Docker Hub accessible"
+    else
+        warning "Docker Hub not accessible - may affect image pulls"
+    fi
 }
 
-# Check and install Terraform
-check_terraform() {
-    log "Checking Terraform..."
+check_file_permissions() {
+    log "Checking file permissions..."
     
-    if ! command -v terraform >/dev/null 2>&1; then
-        log "Terraform not found. Installing..."
-        local os="$(detect_os)"
-        install_package "terraform" "$os"
+    # Check script permissions
+    local scripts=(
+        "scripts/new-app.sh"
+        "scripts/seal-secret.sh"
+        "scripts/tf.sh"
+        "scripts/external-services.sh"
+    )
+    
+    for script in "${scripts[@]}"; do
+        if [[ -x "$script" ]]; then
+            success "$script is executable"
+        else
+            warning "$script is not executable (fixing...)"
+            chmod +x "$script" 2>/dev/null || error "Failed to make $script executable"
+        fi
+    done
+}
+
+print_installation_help() {
+    if [[ ${#MISSING_DEPS[@]} -gt 0 ]]; then
+        echo
+        error "Missing required dependencies:"
+        
+        for dep in "${MISSING_DEPS[@]}"; do
+            case "$dep" in
+                docker)
+                    echo "  Install Docker: https://docs.docker.com/get-docker/"
+                    ;;
+                kubectl)
+                    echo "  Install kubectl: https://kubernetes.io/docs/tasks/tools/"
+                    ;;
+                helm)
+                    echo "  Install Helm: https://helm.sh/docs/intro/install/"
+                    ;;
+                terraform)
+                    echo "  Install Terraform: https://learn.hashicorp.com/tutorials/terraform/install-cli"
+                    ;;
+                k3d)
+                    echo "  Install k3d: https://k3d.io/v5.4.6/#installation"
+                    ;;
+                yamllint)
+                    echo "  Install yamllint: pip install yamllint"
+                    ;;
+                *)
+                    echo "  Install $dep"
+                    ;;
+            esac
+        done
+        echo
     fi
     
-    success "✅ Terraform $(terraform version | head -1 | cut -d' ' -f2)"
-}
-
-# Check and install Helm
-check_helm() {
-    log "Checking Helm..."
-    
-    if ! command -v helm >/dev/null 2>&1; then
-        log "Helm not found. Installing..."
-        local os="$(detect_os)"
-        install_package "helm" "$os"
+    if [[ ${#OPTIONAL_DEPS[@]} -gt 0 ]]; then
+        echo
+        warning "Optional dependencies (recommended):"
+        for dep in "${OPTIONAL_DEPS[@]}"; do
+            case "$dep" in
+                yq)
+                    echo "  Install yq: https://github.com/mikefarah/yq#install"
+                    ;;
+                jq)
+                    echo "  Install jq: https://stedolan.github.io/jq/download/"
+                    ;;
+                *)
+                    echo "  Install $dep"
+                    ;;
+            esac
+        done
+        echo
     fi
-    
-    success "✅ Helm $(helm version --short)"
 }
 
-# Check and install kubeseal
-check_kubeseal() {
-    log "Checking kubeseal..."
-    
-    if ! command -v kubeseal >/dev/null 2>&1; then
-        log "kubeseal not found. Installing..."
-        local os="$(detect_os)"
-        install_package "kubeseal" "$os"
-    fi
-    
-    success "✅ kubeseal $(kubeseal --version 2>&1 | head -1 | cut -d' ' -f3)"
-}
-
-# Check and install yq
-check_yq() {
-    log "Checking yq..."
-    
-    if ! command -v yq >/dev/null 2>&1; then
-        log "yq not found. Installing..."
-        local os="$(detect_os)"
-        install_package "yq" "$os"
-    fi
-    
-    success "✅ yq $(yq --version | cut -d' ' -f4)"
-}
-
-# Check and install jq
-check_jq() {
-    log "Checking jq..."
-    
-    if ! command -v jq >/dev/null 2>&1; then
-        log "jq not found. Installing..."
-        local os="$(detect_os)"
-        install_package "jq" "$os"
-    fi
-    
-    success "✅ jq $(jq --version)"
-}
-
-# Main dependency check
 main() {
-    log "🔍 Checking and installing dependencies for Comind-Ops Platform..."
-    log "OS detected: $(detect_os)"
-    echo ""
+    log "Checking Comind-Ops Platform dependencies..."
+    echo
     
-    # Core dependencies
-    check_docker
-    check_k3d
-    check_kubectl
-    check_terraform
-    check_helm
-    check_kubeseal
-    check_yq
-    check_jq
+    # Required tools
+    check_command "docker" "Docker" true
+    check_command "kubectl" "Kubernetes CLI" true
+    check_command "helm" "Helm" true
+    check_command "terraform" "Terraform" true
+    check_command "k3d" "k3d (local Kubernetes)" true
+    check_command "yamllint" "YAML Linter" true
     
-    echo ""
-    success "🎉 All dependencies are installed and ready!"
+    # Optional but recommended tools
+    check_command "yq" "YAML Processor" false
+    check_command "jq" "JSON Processor" false
+    check_command "curl" "HTTP Client" false
+    check_command "git" "Version Control" false
     
-    # Verify Docker is accessible
-    if ! docker ps >/dev/null 2>&1; then
-        error "Docker daemon is not accessible. Please ensure Docker is running."
-        exit 1
+    echo
+    
+    # Check services
+    check_external_services
+    echo
+    
+    check_k8s_cluster
+    echo
+    
+    check_network_connectivity
+    echo
+    
+    check_file_permissions
+    echo
+    
+    # Summary
+    if [[ ${#MISSING_DEPS[@]} -eq 0 ]]; then
+        success "All required dependencies are available!"
+        
+        if [[ ${#OPTIONAL_DEPS[@]} -gt 0 ]]; then
+            warning "Some optional dependencies are missing but the platform should work"
+        fi
+        
+        log "Platform is ready for bootstrap!"
+        return 0
+    else
+        error "Missing ${#MISSING_DEPS[@]} required dependencies"
+        print_installation_help
+        return 1
     fi
-    
-    # Clean up any stale kubeconfig context
-    if kubectl config get-contexts k3d-comind-ops-dev >/dev/null 2>&1; then
-        log "Removing stale k3d context..."
-        kubectl config delete-context k3d-comind-ops-dev >/dev/null 2>&1 || true
-    fi
-    
-    # Clean up Terraform state if cluster was deleted externally
-    if [ -d "infra/terraform/core/.terraform" ]; then
-        log "Cleaning up stale Terraform state..."
-        rm -rf infra/terraform/core/terraform.tfstate*
-        rm -rf infra/terraform/core/.terraform/terraform.tfstate*
-    fi
-    
-    log "🚀 Ready to bootstrap Comind-Ops Platform!"
 }
 
 main "$@"

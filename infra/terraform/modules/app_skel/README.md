@@ -2,6 +2,8 @@
 
 Comprehensive Terraform module for provisioning application-specific infrastructure in the Comind-Ops Platform. Supports both local development (k3d) and cloud deployments (AWS/DigitalOcean) with a consistent interface.
 
+> **Note**: This module integrates with external PostgreSQL and MinIO services running as Docker containers (managed in `infra/docker/`). For local development, these services are automatically configured to work with the infrastructure provisioned by this module.
+
 ## Overview
 
 The `app_skel` module provides a complete infrastructure foundation for applications, including:

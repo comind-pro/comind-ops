@@ -12,10 +12,6 @@ resources:
   - registry/registry.yaml
   - registry/registry-cleanup.yaml
 
-  # Backup services
-  - backups/postgres-cronjob.yaml
-  - backups/minio-cronjob.yaml
-
 commonLabels:
   app.kubernetes.io/managed-by: kustomize
   app.kubernetes.io/part-of: comind-ops-platform

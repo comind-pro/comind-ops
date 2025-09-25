@@ -16,9 +16,9 @@ keywords:
   - microservice
   - api
 
-home: https://github.com/your-org/comind-ops-cloud-setup
+home: https://github.com/comind-pro/comind-ops
 sources:
-  - https://github.com/your-org/comind-ops-cloud-setup
+  - https://github.com/comind-pro/comind-ops
 
 annotations:
   category: Sample Applications

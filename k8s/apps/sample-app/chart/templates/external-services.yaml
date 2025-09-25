@@ -1,0 +1,72 @@
+# External Services Configuration for Sample App
+# These services run outside Kubernetes as Docker containers
+
+{{- if .Values.database.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sample-app.fullname" . }}-postgres-external
+  labels:
+    {{- include "sample-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: database-external
+spec:
+  type: ExternalName
+  externalName: host.docker.internal
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP
+    name: postgresql
+  sessionAffinity: None
+
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: {{ include "sample-app.fullname" . }}-postgres-external
+subsets:
+- addresses:
+  - ip: {{ .Values.database.externalHost | default "172.20.0.10" }}
+  ports:
+  - port: 5432
+    name: postgresql
+{{- end }}
+
+{{- if .Values.storage.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sample-app.fullname" . }}-minio-external
+  labels:
+    {{- include "sample-app.labels" . | nindent 4 }}
+    app.kubernetes.io/component: storage-external
+spec:
+  type: ExternalName
+  externalName: host.docker.internal
+  ports:
+  - port: 9000
+    targetPort: 9000
+    protocol: TCP
+    name: minio-api
+  - port: 9001
+    targetPort: 9001
+    protocol: TCP
+    name: minio-console
+  sessionAffinity: None
+
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: {{ include "sample-app.fullname" . }}-minio-external
+subsets:
+- addresses:
+  - ip: {{ .Values.storage.externalHost | default "172.20.0.20" }}
+  ports:
+  - port: 9000
+    name: minio-api
+  - port: 9001
+    name: minio-console
+{{- end }}

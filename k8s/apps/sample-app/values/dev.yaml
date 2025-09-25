@@ -74,9 +74,10 @@ env:
 platformServices:
   database:
     enabled: true
-    host: postgres.platform-dev.svc.cluster.local
+    host: sample-app-postgres-external
     port: 5432
-    name: sampleapp_dev
+    name: sample_app_dev
+    user: sample_app_user
     pool:
       min: 1
       max: 5
@@ -92,7 +93,7 @@ platformServices:
 
   storage:
     enabled: true
-    endpoint: minio.platform-dev.svc.cluster.local:9000
+    endpoint: sample-app-minio-external:9000
     secure: false
     buckets:
       - sample-app-uploads-dev
