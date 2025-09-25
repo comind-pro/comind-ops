@@ -25,7 +25,7 @@ variable "ingress_https_port" {
 }
 
 variable "registry_port" {
-  description = "Port for local docker registry"
+  description = "Port for local docker registry (not used in k3d setup)"
   type        = number
   default     = 5000
 }

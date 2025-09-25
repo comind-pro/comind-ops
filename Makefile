@@ -48,18 +48,20 @@ help: ## Show this help message
 # ===========================================
 
 .PHONY: bootstrap
-bootstrap: ## Complete cluster setup (core infrastructure + platform services)
+bootstrap: ## Complete cluster setup (core infrastructure + platform services) 
 	@echo "$(BLUE)🏗️  Bootstrapping Comind-Ops Platform...$(NC)"
-	@echo "$(YELLOW)Step 1/5: Initializing Terraform...$(NC)"
+	@echo "$(YELLOW)Step 1/6: Checking dependencies...$(NC)"
+	@./scripts/check-deps.sh
+	@echo "$(YELLOW)Step 2/6: Initializing Terraform...$(NC)"
 	@terraform -chdir=infra/terraform/core init
-	@echo "$(YELLOW)Step 2/5: Deploying core infrastructure...$(NC)"
+	@echo "$(YELLOW)Step 3/6: Deploying core infrastructure...$(NC)"
 	@./scripts/tf.sh $(ENV) core apply --auto-approve
-	@echo "$(YELLOW)Step 3/5: Waiting for cluster to be ready...$(NC)"
+	@echo "$(YELLOW)Step 4/6: Waiting for cluster to be ready...$(NC)"
 	@sleep 30
 	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || echo "ArgoCD still starting..."
-	@echo "$(YELLOW)Step 4/5: Applying base Kubernetes resources...$(NC)"
+	@echo "$(YELLOW)Step 5/6: Applying base Kubernetes resources...$(NC)"
 	@kubectl apply -k k8s/base/
-	@echo "$(YELLOW)Step 5/5: Deploying platform services...$(NC)"
+	@echo "$(YELLOW)Step 6/6: Deploying platform services...$(NC)"
 	@kubectl apply -k k8s/platform/
 	@echo "$(GREEN)✅ Bootstrap complete!$(NC)"
 	@echo ""

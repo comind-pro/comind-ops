@@ -45,7 +45,6 @@ resource "null_resource" "k3d_cluster" {
           --api-port ${var.cluster_port} \
           --port "${var.ingress_http_port}:80@loadbalancer" \
           --port "${var.ingress_https_port}:443@loadbalancer" \
-          --port "${var.registry_port}:5000@server:0" \
           --k3s-arg "--disable=traefik@server:0" \
           --k3s-arg "--disable=servicelb@server:0" \
           --agents 2 \
@@ -87,190 +86,212 @@ resource "null_resource" "kubeconfig" {
 }
 
 # Configure providers to use k3d cluster
-# In CI environments, skip provider configuration if kubeconfig doesn't exist
+# Use empty configuration during initial bootstrap - resources will be created via local-exec
 provider "kubernetes" {
-  # Only configure if not in CI or if kubeconfig exists
-  config_path    = fileexists(pathexpand("~/.kube/config")) ? "~/.kube/config" : null
-  config_context = fileexists(pathexpand("~/.kube/config")) ? "k3d-${var.cluster_name}" : null
+  config_path    = null
+  config_context = null
 }
 
 provider "helm" {
   kubernetes {
-    # Only configure if not in CI or if kubeconfig exists  
-    config_path    = fileexists(pathexpand("~/.kube/config")) ? "~/.kube/config" : null
-    config_context = fileexists(pathexpand("~/.kube/config")) ? "k3d-${var.cluster_name}" : null
+    config_path    = null
+    config_context = null
   }
 }
 
-# Create namespaces
-resource "kubernetes_namespace" "platform_namespaces" {
-  for_each = toset(["platform-dev", "platform-stage", "platform-prod", "argocd", "sealed-secrets", "metallb-system"])
-
-  metadata {
-    name = each.key
-    labels = {
-      "app.kubernetes.io/managed-by" = "terraform"
-    }
+# Create namespaces using local-exec
+resource "null_resource" "create_namespaces" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Creating Kubernetes namespaces..."
+      for namespace in platform-dev platform-stage platform-prod argocd sealed-secrets metallb-system; do
+        kubectl create namespace $namespace --dry-run=client -o yaml | kubectl apply -f -
+        kubectl label namespace $namespace app.kubernetes.io/managed-by=terraform --overwrite
+      done
+      echo "✅ Namespaces created"
+    EOT
   }
 
   depends_on = [null_resource.kubeconfig]
 }
 
-# MetalLB for local load balancing
-resource "helm_release" "metallb" {
-  name       = "metallb"
-  repository = "https://metallb.github.io/metallb"
-  chart      = "metallb"
-  version    = "0.13.12"
-  namespace  = "metallb-system"
+# MetalLB for local load balancing using local-exec
+resource "null_resource" "install_metallb" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Installing MetalLB..."
+      helm repo add metallb https://metallb.github.io/metallb
+      helm repo update
+      helm upgrade --install metallb metallb/metallb \
+        --version 0.13.12 \
+        --namespace metallb-system \
+        --wait
+      echo "✅ MetalLB installed"
+    EOT
+  }
 
-  depends_on = [kubernetes_namespace.platform_namespaces]
+  depends_on = [null_resource.create_namespaces]
 }
 
 # MetalLB IP Address Pool Configuration
-resource "kubernetes_manifest" "metallb_ippool" {
-  manifest = {
-    apiVersion = "metallb.io/v1beta1"
-    kind       = "IPAddressPool"
-    metadata = {
-      name      = "default-pool"
-      namespace = "metallb-system"
-    }
-    spec = {
-      addresses = ["172.18.255.200-172.18.255.250"]
-    }
+# Using null_resource with local-exec to apply after MetalLB CRDs are ready
+resource "null_resource" "metallb_config" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      # Wait for MetalLB CRDs to be available
+      echo "Waiting for MetalLB CRDs to be ready..."
+      timeout=300
+      while [ $timeout -gt 0 ]; do
+        if kubectl get crd ipaddresspools.metallb.io >/dev/null 2>&1; then
+          echo "MetalLB CRDs are ready"
+          break
+        fi
+        echo "Waiting for MetalLB CRDs... ($timeout seconds left)"
+        sleep 10
+        timeout=$((timeout - 10))
+      done
+      
+      if [ $timeout -le 0 ]; then
+        echo "ERROR: MetalLB CRDs not ready within 300 seconds"
+        exit 1
+      fi
+      
+      # Apply IPAddressPool
+      kubectl apply -f - <<EOF
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: default-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 172.18.255.200-172.18.255.250
+EOF
+      
+      # Apply L2Advertisement
+      kubectl apply -f - <<EOF
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: default
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - default-pool
+EOF
+      
+      echo "MetalLB configuration applied successfully"
+    EOT
   }
 
-  depends_on = [helm_release.metallb]
+  depends_on = [null_resource.install_metallb]
+  
+  triggers = {
+    metallb_release = null_resource.install_metallb.id
+  }
 }
 
-# MetalLB L2 Advertisement
-resource "kubernetes_manifest" "metallb_l2advertisement" {
-  manifest = {
-    apiVersion = "metallb.io/v1beta1"
-    kind       = "L2Advertisement"
-    metadata = {
-      name      = "default"
-      namespace = "metallb-system"
-    }
-    spec = {
-      ipAddressPools = ["default-pool"]
-    }
+# Ingress Nginx Controller using local-exec
+resource "null_resource" "install_ingress_nginx" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Installing Ingress Nginx..."
+      helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+      helm repo update
+      
+      # Create ingress-nginx namespace
+      kubectl create namespace ingress-nginx --dry-run=client -o yaml | kubectl apply -f -
+      
+      # Install ingress-nginx with custom values
+      helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+        --version 4.8.3 \
+        --namespace ingress-nginx \
+        --set controller.service.type=LoadBalancer \
+        --set controller.service.annotations."metallb\.universe\.tf/address-pool"=default-pool \
+        --set controller.ingressClassResource.default=true \
+        --set controller.config.use-forwarded-headers=true \
+        --set controller.config.compute-full-forwarded-for=true \
+        --wait
+      echo "✅ Ingress Nginx installed"
+    EOT
   }
 
-  depends_on = [helm_release.metallb]
-}
-
-# Ingress Nginx Controller
-resource "helm_release" "ingress_nginx" {
-  name       = "ingress-nginx"
-  repository = "https://kubernetes.github.io/ingress-nginx"
-  chart      = "ingress-nginx"
-  version    = "4.8.3"
-  namespace  = "ingress-nginx"
-
-  create_namespace = true
-
-  values = [
-    yamlencode({
-      controller = {
-        service = {
-          type = "LoadBalancer"
-          annotations = {
-            "metallb.universe.tf/address-pool" = "default-pool"
-          }
-        }
-        ingressClassResource = {
-          default = true
-        }
-        config = {
-          use-forwarded-headers      = "true"
-          compute-full-forwarded-for = "true"
-        }
-      }
-    })
-  ]
-
-  depends_on = [helm_release.metallb, kubernetes_manifest.metallb_ippool]
+  depends_on = [null_resource.install_metallb, null_resource.metallb_config]
 }
 
 # Sealed Secrets Controller
-resource "helm_release" "sealed_secrets" {
-  name       = "sealed-secrets"
-  repository = "https://bitnami-labs.github.io/sealed-secrets"
-  chart      = "sealed-secrets"
-  version    = "2.13.2"
-  namespace  = "sealed-secrets"
+# Sealed Secrets Controller using local-exec
+resource "null_resource" "install_sealed_secrets" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Installing Sealed Secrets..."
+      helm repo add sealed-secrets https://bitnami-labs.github.io/sealed-secrets
+      helm repo update
+      helm upgrade --install sealed-secrets sealed-secrets/sealed-secrets \
+        --version 2.13.2 \
+        --namespace sealed-secrets \
+        --set commandArgs="{--update-status}" \
+        --set fullnameOverride=sealed-secrets-controller \
+        --wait
+      echo "✅ Sealed Secrets installed"
+    EOT
+  }
 
-  values = [
-    yamlencode({
-      fullnameOverride = "sealed-secrets-controller"
-      commandArgs = [
-        "--update-status"
-      ]
-    })
-  ]
-
-  depends_on = [kubernetes_namespace.platform_namespaces]
+  depends_on = [null_resource.create_namespaces]
 }
 
-# ArgoCD Installation
-resource "helm_release" "argocd" {
-  name       = "argocd"
-  repository = "https://argoproj.github.io/argo-helm"
-  chart      = "argo-cd"
-  version    = "5.51.6"
-  namespace  = "argocd"
+# ArgoCD Installation using local-exec
+resource "null_resource" "install_argocd" {
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "Installing ArgoCD..."
+      helm repo add argo https://argoproj.github.io/argo-helm
+      helm repo update
+      
+      # Create ArgoCD values file
+      cat > /tmp/argocd-values.yaml << 'EOF'
+global:
+  domain: argocd.${var.environment}.127.0.0.1.nip.io
+configs:
+  params:
+    server.insecure: true
+  cm:
+    application.instanceLabelKey: argocd.argoproj.io/instance
+server:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    hosts:
+      - host: argocd.${var.environment}.127.0.0.1.nip.io
+        paths:
+          - path: /
+            pathType: Prefix
+applicationSet:
+  enabled: true
+EOF
+      
+      # Install ArgoCD
+      helm upgrade --install argocd argo/argo-cd \
+        --version 5.51.6 \
+        --namespace argocd \
+        --values /tmp/argocd-values.yaml \
+        --wait
+      
+      # Clean up temp file
+      rm -f /tmp/argocd-values.yaml
+      echo "✅ ArgoCD installed"
+    EOT
+  }
 
-  values = [
-    yamlencode({
-      global = {
-        domain = "argocd.${var.environment}.127.0.0.1.nip.io"
-      }
-
-      configs = {
-        params = {
-          "server.insecure" = true
-        }
-        cm = {
-          "application.instanceLabelKey" = "argocd.argoproj.io/instance"
-        }
-      }
-
-      server = {
-        ingress = {
-          enabled          = true
-          ingressClassName = "nginx"
-          annotations = {
-            "nginx.ingress.kubernetes.io/ssl-redirect"     = "false"
-            "nginx.ingress.kubernetes.io/backend-protocol" = "HTTP"
-          }
-          hosts = [
-            {
-              host = "argocd.${var.environment}.127.0.0.1.nip.io"
-              paths = [
-                {
-                  path     = "/"
-                  pathType = "Prefix"
-                }
-              ]
-            }
-          ]
-        }
-      }
-
-      applicationSet = {
-        enabled = true
-      }
-    })
-  ]
-
-  depends_on = [kubernetes_namespace.platform_namespaces, helm_release.ingress_nginx]
+  depends_on = [null_resource.create_namespaces, null_resource.install_ingress_nginx]
 }
 
 # Wait for ArgoCD to be ready
 resource "null_resource" "wait_for_argocd" {
-  depends_on = [helm_release.argocd]
+  depends_on = [null_resource.install_argocd]
 
   provisioner "local-exec" {
     command = <<-EOT

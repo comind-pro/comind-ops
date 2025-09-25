@@ -32,9 +32,10 @@ output "argocd_credentials" {
   description = "ArgoCD admin credentials"
   value = {
     username = "admin"
-    password = data.external.argocd_password.result.password
+    password = try(data.external.argocd_password.result.password, "admin")
   }
-  sensitive = true
+  sensitive   = true
+  depends_on = [null_resource.wait_for_argocd]
 }
 
 output "registry_endpoint" {
@@ -43,6 +44,6 @@ output "registry_endpoint" {
 }
 
 output "namespaces_created" {
-  description = "List of namespaces created"
-  value       = keys(kubernetes_namespace.platform_namespaces)
+  description = "List of namespaces created by Terraform"
+  value       = ["platform-dev", "platform-stage", "platform-prod", "argocd", "sealed-secrets", "metallb-system"]
 }

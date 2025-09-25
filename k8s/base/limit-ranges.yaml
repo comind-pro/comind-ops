@@ -13,8 +13,7 @@ spec:
     defaultRequest:
       cpu: "100m"
       memory: "128Mi"
-    type: Container
-  - max:
+    max:
       cpu: "2"
       memory: "4Gi"
     min:
@@ -41,8 +40,7 @@ spec:
     defaultRequest:
       cpu: "100m"
       memory: "128Mi"
-    type: Container
-  - max:
+    max:
       cpu: "1"
       memory: "2Gi"
     min:
@@ -69,8 +67,7 @@ spec:
     defaultRequest:
       cpu: "200m"
       memory: "256Mi"
-    type: Container
-  - max:
+    max:
       cpu: "4"
       memory: "8Gi"
     min:

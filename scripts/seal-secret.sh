@@ -233,11 +233,13 @@ log "  Input: $SECRET_FILE"
 log "  Output: $OUTPUT_FILE"
 
 if [[ "$DRY_RUN" == "true" ]]; then
-    log "[DRY-RUN] Would run: kubeseal --format=yaml --namespace=$NAMESPACE < $TEMP_SECRET_FILE > $OUTPUT_FILE"
+    log "[DRY-RUN] Would run: kubeseal --controller-name=sealed-secrets-controller --controller-namespace=sealed-secrets --format=yaml --namespace=$NAMESPACE < $TEMP_SECRET_FILE > $OUTPUT_FILE"
     log "[DRY-RUN] Secret sealing simulation complete"
 else
     # Create the sealed secret
-    if kubeseal --format=yaml --namespace="$NAMESPACE" < "$TEMP_SECRET_FILE" > "$OUTPUT_FILE"; then
+    if kubeseal --controller-name=sealed-secrets-controller \
+                 --controller-namespace=sealed-secrets \
+                 --format=yaml --namespace="$NAMESPACE" < "$TEMP_SECRET_FILE" > "$OUTPUT_FILE"; then
         success "✅ Secret sealed successfully!"
         log "Sealed secret saved to: $OUTPUT_FILE"
         
