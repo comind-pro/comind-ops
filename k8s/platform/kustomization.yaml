@@ -5,39 +5,39 @@ kind: Kustomization
 namespace: platform-dev
 
 resources:
-    # ElasticMQ (SQS-compatible queue service)
-    - elasticmq/deployment.yaml
+  # ElasticMQ (SQS-compatible queue service)
+  - elasticmq/deployment.yaml
 
-    # Docker Registry with retention
-    - registry/registry.yaml
-    - registry/registry-cleanup.yaml
+  # Docker Registry with retention
+  - registry/registry.yaml
+  - registry/registry-cleanup.yaml
 
-    # Backup services
-    - backups/postgres-cronjob.yaml
-    - backups/minio-cronjob.yaml
+  # Backup services
+  - backups/postgres-cronjob.yaml
+  - backups/minio-cronjob.yaml
 
 commonLabels:
-    app.kubernetes.io/managed-by: kustomize
-    app.kubernetes.io/part-of: comind-ops-platform
-    environment: development
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/part-of: comind-ops-platform
+  environment: development
 
 commonAnnotations:
-    comind-ops.io/version: "1.0.0"
-    comind-ops.io/platform-services: "true"
+  comind-ops.io/version: "1.0.0"
+  comind-ops.io/platform-services: "true"
 
 # Configuration patches for development environment
 patches:
-    # ElasticMQ resource adjustments for dev
-    - target:
-        kind: Deployment
-        name: elasticmq
+  # ElasticMQ resource adjustments for dev
+  - target:
+      kind: Deployment
+      name: elasticmq
       patch: |-
-        - op: replace
-          path: /spec/replicas
-          value: 1
-        - op: replace
-          path: /spec/template/spec/containers/0/resources/limits/memory
-          value: "512Mi"
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "512Mi"
 
     # Registry storage adjustment for dev
     - target:

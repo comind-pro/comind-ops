@@ -79,6 +79,7 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: |
           echo "🏃 Initializing Terraform in ${{ matrix.path }}..."
+          export TF_VAR_cluster_type=ci
           terraform init -input=false
           echo "✅ Terraform initialized"
 
@@ -95,8 +96,9 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: |
           echo "📋 Running Terraform plan..."
+          export TF_VAR_cluster_type=ci
           terraform plan -detailed-exitcode -out=tfplan -input=false \
-            -var="cluster_type=local" \
+            -var="cluster_type=ci" \
             -var="environment=${{ env.TF_VAR_environment }}" \
             2>&1 | tee plan_output.txt
 

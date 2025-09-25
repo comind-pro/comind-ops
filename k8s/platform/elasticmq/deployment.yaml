@@ -2,22 +2,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-    name: elasticmq
-    namespace: platform-dev
-    labels:
-      app: elasticmq
-      component: queue
+  name: elasticmq
+  namespace: platform-dev
+  labels:
+    app: elasticmq
+    component: queue
 spec:
-    replicas: 1
-    selector:
-      matchLabels:
-        app: elasticmq
-    template:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticmq
+  template:
       metadata:
-        labels:
-          app: elasticmq
-          component: queue
-      spec:
+      labels:
+        app: elasticmq
+        component: queue
+    spec:
         securityContext:
           runAsNonRoot: true
           runAsUser: 1000

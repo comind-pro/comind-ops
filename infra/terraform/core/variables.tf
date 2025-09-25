@@ -41,7 +41,7 @@ variable "cluster_type" {
   type        = string
   default     = "local"
   validation {
-    condition     = contains(["local", "aws", "digitalocean"], var.cluster_type)
-    error_message = "Cluster type must be one of: local, aws, digitalocean."
+    condition     = contains(["local", "aws", "digitalocean", "ci"], var.cluster_type)
+    error_message = "Cluster type must be one of: local, aws, digitalocean, ci."
   }
 }

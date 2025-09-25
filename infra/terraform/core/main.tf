@@ -36,6 +36,13 @@ resource "null_resource" "k3d_cluster" {
 
   provisioner "local-exec" {
     command = <<-EOT
+      # Check if we're in CI environment
+      if [ "${var.cluster_type}" = "ci" ] || [ -n "$CI" ] || [ -n "$GITHUB_ACTIONS" ]; then
+        echo "CI environment detected, skipping k3d cluster creation"
+        echo "This would be handled by external cluster setup in CI"
+        exit 0
+      fi
+      
       # Check if cluster already exists
       if k3d cluster list | grep -q "${var.cluster_name}"; then
         echo "Cluster ${var.cluster_name} already exists, skipping creation"
