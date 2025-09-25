@@ -21,9 +21,40 @@ terraform {
   }
 }
 
-# Local PostgreSQL deployment (k3d)
-resource "helm_release" "postgresql" {
+# Local PostgreSQL deployment (k3d) - DISABLED: Using external Docker PostgreSQL
+# External PostgreSQL service runs via docker-compose in infra/docker/
+# This creates ExternalName service to reference the external PostgreSQL
+resource "kubernetes_service" "postgresql_external" {
   count = var.cluster_type == "local" ? 1 : 0
+
+  metadata {
+    name      = "${var.app_name}-postgresql-external"
+    namespace = var.kubernetes_namespace
+    labels = {
+      "app.kubernetes.io/name"       = "postgresql"
+      "app.kubernetes.io/instance"   = "${var.app_name}-postgresql"
+      "app.kubernetes.io/component"  = "external-database"
+      "app.kubernetes.io/part-of"    = "comind-ops-platform"
+      "comind-ops.io/external-service" = "true"
+      "comind-ops.io/service-type"     = "postgresql"
+    }
+  }
+
+  spec {
+    type          = "ExternalName"
+    external_name = var.database_config.external_host # Default: "localhost" for Docker host
+    port {
+      port        = 5432
+      target_port = 5432
+      protocol    = "TCP"
+      name        = "postgresql"
+    }
+  }
+}
+
+# Traditional local PostgreSQL deployment (k3d) - COMMENTED OUT: Using external services
+# resource "helm_release" "postgresql" {
+#   count = var.cluster_type == "local" ? 1 : 0
 
   name       = "${var.app_name}-postgresql"
   repository = "https://charts.bitnami.com/bitnami"

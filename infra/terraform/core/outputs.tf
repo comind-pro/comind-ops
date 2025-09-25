@@ -47,3 +47,14 @@ output "namespaces_created" {
   description = "List of namespaces created by Terraform"
   value       = ["platform-dev", "platform-stage", "platform-prod", "argocd", "sealed-secrets", "metallb-system"]
 }
+
+output "external_services_status" {
+  description = "Status of external services (PostgreSQL, MinIO)"
+  value = var.cluster_type == "local" ? {
+    postgres_status = data.external.external_services_check.result["postgres_status"]
+    postgres_health = data.external.external_services_check.result["postgres_health"]
+    minio_status    = data.external.external_services_check.result["minio_status"]
+    minio_health    = data.external.external_services_check.result["minio_health"]
+    services_ready  = data.external.external_services_check.result["services_ready"]
+  } : null
+}

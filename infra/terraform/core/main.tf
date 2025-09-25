@@ -322,3 +322,81 @@ data "external" "argocd_password" {
   ]
 }
 
+# External services validation
+data "external" "external_services_check" {
+  program = ["bash", "-c", <<-EOT
+    # Check if external services are running and healthy
+    if ! command -v docker &> /dev/null; then
+      echo '{"error": "Docker not available", "services_ready": "false"}'
+      exit 0
+    fi
+    
+    # Initialize status variables
+    postgres_status="stopped"
+    minio_status="stopped" 
+    postgres_health="unknown"
+    minio_health="unknown"
+    
+    # Check PostgreSQL container
+    if docker ps --format "{{.Names}}" | grep -q "^comind-ops-postgres$"; then
+      postgres_status="running"
+      postgres_health=$(docker inspect comind-ops-postgres --format '{{.State.Health.Status}}' 2>/dev/null || echo "no-healthcheck")
+    fi
+    
+    # Check MinIO container
+    if docker ps --format "{{.Names}}" | grep -q "^comind-ops-minio$"; then
+      minio_status="running"
+      minio_health=$(docker inspect comind-ops-minio --format '{{.State.Health.Status}}' 2>/dev/null || echo "no-healthcheck")
+    fi
+    
+    # Determine overall readiness
+    services_ready="false"
+    if [ "$postgres_status" = "running" ] && [ "$minio_status" = "running" ]; then
+      if [ "$postgres_health" = "healthy" ] && [ "$minio_health" = "healthy" ]; then
+        services_ready="true"
+      elif [ "$postgres_health" = "no-healthcheck" ] && [ "$minio_health" = "no-healthcheck" ]; then
+        services_ready="assumed_healthy"
+      fi
+    fi
+    
+    echo "{\"postgres_status\": \"$postgres_status\", \"postgres_health\": \"$postgres_health\", \"minio_status\": \"$minio_status\", \"minio_health\": \"$minio_health\", \"services_ready\": \"$services_ready\"}"
+  EOT
+  ]
+}
+
+# Validation for external services
+resource "null_resource" "external_services_validation" {
+  count = var.cluster_type == "local" ? 1 : 0
+  
+  triggers = {
+    services_check = data.external.external_services_check.result["services_ready"]
+  }
+  
+  provisioner "local-exec" {
+    command = <<-EOT
+      POSTGRES_STATUS="${data.external.external_services_check.result["postgres_status"]}"
+      MINIO_STATUS="${data.external.external_services_check.result["minio_status"]}"
+      POSTGRES_HEALTH="${data.external.external_services_check.result["postgres_health"]}"
+      MINIO_HEALTH="${data.external.external_services_check.result["minio_health"]}"
+      SERVICES_READY="${data.external.external_services_check.result["services_ready"]}"
+      
+      echo "🔍 External Services Status Check:"
+      echo "  PostgreSQL: $POSTGRES_STATUS ($POSTGRES_HEALTH)"
+      echo "  MinIO: $MINIO_STATUS ($MINIO_HEALTH)"
+      echo "  Overall: $SERVICES_READY"
+      
+      if [ "$SERVICES_READY" = "false" ]; then
+        echo "❌ External services are not ready!"
+        echo "💡 Please run: make services-start"
+        echo "   or: ./scripts/external-services.sh start"
+        exit 1
+      elif [ "$SERVICES_READY" = "assumed_healthy" ]; then
+        echo "⚠️  External services are running but health checks unavailable"
+        echo "✅ Assuming services are healthy and proceeding..."
+      else
+        echo "✅ External services are healthy and ready!"
+      fi
+    EOT
+  }
+}
+
