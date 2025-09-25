@@ -437,3 +437,6 @@ up: bootstrap ## Alias for bootstrap
 
 .PHONY: down  
 down: cleanup ## Alias for cleanup
+
+.PHONY: clean
+clean: cleanup ## Alias for cleanup

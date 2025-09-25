@@ -192,7 +192,7 @@ EOF
   }
 
   depends_on = [null_resource.install_metallb]
-  
+
   triggers = {
     metallb_release = null_resource.install_metallb.id
   }
@@ -367,11 +367,11 @@ data "external" "external_services_check" {
 # Validation for external services
 resource "null_resource" "external_services_validation" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   triggers = {
     services_check = data.external.external_services_check.result["services_ready"]
   }
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       POSTGRES_STATUS="${data.external.external_services_check.result["postgres_status"]}"

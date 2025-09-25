@@ -1,7 +1,7 @@
 # External Services Configuration for Sample App
 # These services run outside Kubernetes as Docker containers
 
-{{- if .Values.database.enabled }}
+{{- if .Values.platformServices.database.enabled }}
 ---
 apiVersion: v1
 kind: Service
@@ -27,13 +27,13 @@ metadata:
   name: {{ include "sample-app.fullname" . }}-postgres-external
 subsets:
 - addresses:
-  - ip: {{ .Values.database.externalHost | default "172.20.0.10" }}
+  - ip: {{ .Values.platformServices.database.externalHost | default "172.20.0.10" }}
   ports:
   - port: 5432
     name: postgresql
 {{- end }}
 
-{{- if .Values.storage.enabled }}
+{{- if .Values.platformServices.storage.enabled }}
 ---
 apiVersion: v1
 kind: Service
@@ -63,7 +63,7 @@ metadata:
   name: {{ include "sample-app.fullname" . }}-minio-external
 subsets:
 - addresses:
-  - ip: {{ .Values.storage.externalHost | default "172.20.0.20" }}
+  - ip: {{ .Values.platformServices.storage.externalHost | default "172.20.0.20" }}
   ports:
   - port: 9000
     name: minio-api

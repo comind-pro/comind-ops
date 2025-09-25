@@ -31,10 +31,10 @@ resource "kubernetes_service" "postgresql_external" {
     name      = "${var.app_name}-postgresql-external"
     namespace = var.kubernetes_namespace
     labels = {
-      "app.kubernetes.io/name"       = "postgresql"
-      "app.kubernetes.io/instance"   = "${var.app_name}-postgresql"
-      "app.kubernetes.io/component"  = "external-database"
-      "app.kubernetes.io/part-of"    = "comind-ops-platform"
+      "app.kubernetes.io/name"         = "postgresql"
+      "app.kubernetes.io/instance"     = "${var.app_name}-postgresql"
+      "app.kubernetes.io/component"    = "external-database"
+      "app.kubernetes.io/part-of"      = "comind-ops-platform"
       "comind-ops.io/external-service" = "true"
       "comind-ops.io/service-type"     = "postgresql"
     }
@@ -56,64 +56,64 @@ resource "kubernetes_service" "postgresql_external" {
 # resource "helm_release" "postgresql" {
 #   count = var.cluster_type == "local" ? 1 : 0
 
-  name       = "${var.app_name}-postgresql"
-  repository = "https://charts.bitnami.com/bitnami"
-  chart      = "postgresql"
-  version    = "12.12.10"
-  namespace  = var.kubernetes_namespace
+name       = "${var.app_name}-postgresql"
+repository = "https://charts.bitnami.com/bitnami"
+chart      = "postgresql"
+version    = "12.12.10"
+namespace  = var.kubernetes_namespace
 
-  values = [
-    yamlencode({
-      global = {
-        postgresql = {
-          auth = {
-            postgresPassword = var.database_password
-            username         = var.database_username
-            password         = var.database_password
-            database         = var.database_name
-          }
+values = [
+  yamlencode({
+    global = {
+      postgresql = {
+        auth = {
+          postgresPassword = var.database_password
+          username         = var.database_username
+          password         = var.database_password
+          database         = var.database_name
         }
       }
+    }
 
-      architecture = var.database_config.local_replica_count > 1 ? "replication" : "standalone"
+    architecture = var.database_config.local_replica_count > 1 ? "replication" : "standalone"
 
-      primary = {
-        persistence = {
-          enabled = true
-          size    = var.database_config.local_storage_size
-        }
-        resources = {
-          requests = {
-            memory = var.environment == "prod" ? "512Mi" : var.environment == "stage" ? "256Mi" : "128Mi"
-            cpu    = var.environment == "prod" ? "500m" : var.environment == "stage" ? "250m" : "100m"
-          }
-          limits = {
-            memory = var.environment == "prod" ? "1Gi" : var.environment == "stage" ? "512Mi" : "256Mi"
-            cpu    = var.environment == "prod" ? "1000m" : var.environment == "stage" ? "500m" : "200m"
-          }
-        }
-      }
-
-      readReplicas = {
-        replicaCount = var.database_config.local_replica_count > 1 ? var.database_config.local_replica_count - 1 : 0
-      }
-
-      metrics = {
+    primary = {
+      persistence = {
         enabled = true
-        serviceMonitor = {
-          enabled = true
+        size    = var.database_config.local_storage_size
+      }
+      resources = {
+        requests = {
+          memory = var.environment == "prod" ? "512Mi" : var.environment == "stage" ? "256Mi" : "128Mi"
+          cpu    = var.environment == "prod" ? "500m" : var.environment == "stage" ? "250m" : "100m"
+        }
+        limits = {
+          memory = var.environment == "prod" ? "1Gi" : var.environment == "stage" ? "512Mi" : "256Mi"
+          cpu    = var.environment == "prod" ? "1000m" : var.environment == "stage" ? "500m" : "200m"
         }
       }
+    }
 
-      networkPolicy = {
-        enabled       = true
-        allowExternal = false
+    readReplicas = {
+      replicaCount = var.database_config.local_replica_count > 1 ? var.database_config.local_replica_count - 1 : 0
+    }
+
+    metrics = {
+      enabled = true
+      serviceMonitor = {
+        enabled = true
       }
-    })
-  ]
+    }
 
-  # depends_on = [] # Namespace created by parent module
-}
+    networkPolicy = {
+      enabled       = true
+      allowExternal = false
+    }
+  })
+]
+
+# depends_on = [] # Namespace created by parent module
+# }
 
 # AWS RDS PostgreSQL instance
 resource "aws_db_instance" "postgresql" {

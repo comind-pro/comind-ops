@@ -288,6 +288,7 @@ dev.override.*
 # Test outputs
 test-output/
 test-results/
+tests/reports/
 coverage/
 
 # Local scripts

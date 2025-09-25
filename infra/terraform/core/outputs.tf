@@ -34,7 +34,7 @@ output "argocd_credentials" {
     username = "admin"
     password = try(data.external.argocd_password.result.password, "admin")
   }
-  sensitive   = true
+  sensitive  = true
   depends_on = [null_resource.wait_for_argocd]
 }
 

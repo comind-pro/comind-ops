@@ -291,33 +291,43 @@ generate_report() {
 # Generate JUnit XML report
 generate_junit_report() {
     local results=("$@")
-    cat << EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuites name="ComindOps Platform Tests" time="$(date)" tests="${#results[@]}">
-$(
+    local test_count=${#results[@]}
+    local failed_count=0
+    
+    # Count failures
+    for result in "${results[@]}"; do
+        if [[ "$result" != "0" ]]; then
+            ((failed_count++))
+        fi
+    done
+    
+    # Generate XML header
+    echo '<?xml version="1.0" encoding="UTF-8"?>'
+    echo "<testsuites name=\"ComindOps Platform Tests\" time=\"$(date)\" tests=\"$test_count\" failures=\"$failed_count\">"
+    
+    # Generate test suites
+    local categories=("unit" "integration" "e2e" "performance")
     for i in "${!results[@]}"; do
-        local category=""
-        case $i in
-            0) category="unit" ;;
-            1) category="integration" ;;
-            2) category="e2e" ;;
-            3) category="performance" ;;
-        esac
-        
+        local category="${categories[$i]:-unknown}"
+        local result="${results[$i]}"
         local status="passed"
         local failure=""
-        if [[ "${results[$i]}" != "0" ]]; then
+        
+        if [[ "$result" != "0" ]]; then
             status="failed"
-            failure='<failure message="Test suite failed"/>'
+            failure="<failure message=\"Test failed with exit code $result\" />"
         fi
         
-        echo "  <testsuite name=\"$category\" tests=\"1\" failures=\"$([ "${results[$i]}" != "0" ] && echo 1 || echo 0)\">"
-        echo "    <testcase name=\"$category-tests\" status=\"$status\">$failure</testcase>"
+        echo "  <testsuite name=\"$category\" tests=\"1\" failures=\"$([ "$status" = "failed" ] && echo "1" || echo "0")\">"
+        echo "    <testcase name=\"$category-tests\" classname=\"ComindOps.$category\">"
+        if [[ -n "$failure" ]]; then
+            echo "      $failure"
+        fi
+        echo "    </testcase>"
         echo "  </testsuite>"
     done
-)
-</testsuites>
-EOF
+    
+    echo "</testsuites>"
 }
 
 # Generate HTML report
