@@ -1,0 +1,56 @@
+# =============================================================================
+# Development Environment Configuration Example
+# =============================================================================
+# This file contains configuration values for the development environment.
+# Copy this file to terraform.tfvars and modify the values as needed.
+
+# -----------------------------------------------------------------------------
+# Environment Configuration
+# -----------------------------------------------------------------------------
+environment  = "dev"                        # Environment name
+cluster_name = "comind-ops-dev"             # Name of the cluster
+
+# -----------------------------------------------------------------------------
+# AWS Configuration
+# -----------------------------------------------------------------------------
+aws_region = "us-west-2"                    # AWS region for resources
+
+# -----------------------------------------------------------------------------
+# EKS Cluster Configuration (Development)
+# -----------------------------------------------------------------------------
+eks_cluster_version = "1.28"                # Kubernetes version for EKS cluster
+
+# -----------------------------------------------------------------------------
+# EKS Node Group Configuration (Development - Smaller instances)
+# -----------------------------------------------------------------------------
+eks_node_instance_type = "t3.small"         # Instance type for EKS worker nodes (smaller for dev)
+eks_node_desired_size = 1                   # Desired number of EKS worker nodes (minimal for dev)
+eks_node_max_size     = 3                   # Maximum number of EKS worker nodes
+eks_node_min_size     = 1                   # Minimum number of EKS worker nodes
+
+# -----------------------------------------------------------------------------
+# Network Configuration
+# -----------------------------------------------------------------------------
+vpc_cidr = "10.0.0.0/16"                   # CIDR block for VPC
+
+# -----------------------------------------------------------------------------
+# Development-Specific Configuration
+# -----------------------------------------------------------------------------
+# Enable development features
+enable_debug_logging = true
+enable_dev_tools     = true
+
+# Resource limits for development
+resource_limits = {
+  cpu    = "1"
+  memory = "2Gi"
+}
+
+# Development tags
+tags = {
+  Environment = "development"
+  Project     = "comind-ops"
+  ManagedBy   = "terraform"
+  CostCenter  = "engineering"
+  Owner       = "dev-team"
+}

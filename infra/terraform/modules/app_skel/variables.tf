@@ -60,6 +60,10 @@ variable "database" {
     # External service configuration for local development
     external_host = optional(string, "localhost")
     external_port = optional(number, 5432)
+    # Override credentials for external services
+    username      = optional(string, null)
+    password      = optional(string, null)
+    database_name = optional(string, null)
   })
   default = {
     enabled = false

@@ -66,6 +66,11 @@ resource "helm_release" "minio" {
         size    = var.storage_config.local_storage_size
       }
 
+      # Disable problematic features that require CRDs
+      monitoring = {
+        enabled = false
+      }
+      
       # Resources
       resources = {
         requests = {

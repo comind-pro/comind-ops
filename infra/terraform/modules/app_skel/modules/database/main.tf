@@ -45,7 +45,7 @@ resource "kubernetes_service" "postgresql_external" {
     external_name = var.database_config.external_host # Default: "localhost" for Docker host
     port {
       port        = 5432
-      target_port = 5432
+      target_port = var.database_config.external_port
       protocol    = "TCP"
       name        = "postgresql"
     }
@@ -305,7 +305,7 @@ resource "kubernetes_job" "database_init" {
 
 # Local variables
 locals {
-  database_host = var.cluster_type == "local" ? "${var.app_name}-postgresql.${var.kubernetes_namespace}.svc.cluster.local" : (
+  database_host = var.cluster_type == "local" ? "${var.app_name}-postgresql-external.${var.kubernetes_namespace}.svc.cluster.local" : (
     var.cluster_type == "aws" ? aws_db_instance.postgresql[0].endpoint : (
       var.cluster_type == "digitalocean" ? digitalocean_database_cluster.postgresql[0].host : ""
     )

@@ -1,0 +1,44 @@
+# =============================================================================
+# Local Development Environment Configuration Example
+# =============================================================================
+# This file contains configuration values for local development with k3d.
+# Copy this file to terraform.tfvars and modify the values as needed.
+
+# -----------------------------------------------------------------------------
+# Cluster Configuration
+# -----------------------------------------------------------------------------
+cluster_name       = "comind-ops-dev"        # Name of the k3d cluster
+cluster_port       = 6443                   # Port to expose the cluster API
+environment        = "dev"                  # Environment name
+
+# -----------------------------------------------------------------------------
+# Ingress Configuration
+# -----------------------------------------------------------------------------
+ingress_http_port  = 8080                   # HTTP port for ingress
+ingress_https_port = 8443                   # HTTPS port for ingress
+
+# -----------------------------------------------------------------------------
+# Registry Configuration
+# -----------------------------------------------------------------------------
+registry_port      = 5000                   # Port for local docker registry
+
+# -----------------------------------------------------------------------------
+# Development-Specific Configuration
+# -----------------------------------------------------------------------------
+# Enable development features
+enable_debug_logging = true
+enable_dev_tools     = true
+
+# Resource limits for local development
+resource_limits = {
+  cpu    = "2"
+  memory = "4Gi"
+}
+
+# Development tags
+tags = {
+  Environment = "development"
+  Project     = "comind-ops"
+  ManagedBy   = "terraform"
+  Owner       = "developer"
+}

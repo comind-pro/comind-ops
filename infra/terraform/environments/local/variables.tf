@@ -1,5 +1,11 @@
 # Variables for local environment
 
+variable "cluster_type" {
+  description = "Type of cluster (local, aws, ci)"
+  type        = string
+  default     = "local"
+}
+
 variable "cluster_name" {
   description = "Name of the k3d cluster"
   type        = string

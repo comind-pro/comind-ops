@@ -1,0 +1,67 @@
+# =============================================================================
+# Staging Environment Configuration Example
+# =============================================================================
+# This file contains configuration values for the staging environment.
+# Copy this file to terraform.tfvars and modify the values as needed.
+
+# -----------------------------------------------------------------------------
+# Environment Configuration
+# -----------------------------------------------------------------------------
+environment  = "stage"                      # Environment name
+cluster_name = "comind-ops-stage"           # Name of the cluster
+
+# -----------------------------------------------------------------------------
+# AWS Configuration
+# -----------------------------------------------------------------------------
+aws_region = "us-west-2"                    # AWS region for resources
+
+# -----------------------------------------------------------------------------
+# EKS Cluster Configuration (Staging)
+# -----------------------------------------------------------------------------
+eks_cluster_version = "1.28"                # Kubernetes version for EKS cluster
+
+# -----------------------------------------------------------------------------
+# EKS Node Group Configuration (Staging - Medium instances)
+# -----------------------------------------------------------------------------
+eks_node_instance_type = "t3.medium"        # Instance type for EKS worker nodes
+eks_node_desired_size = 2                   # Desired number of EKS worker nodes
+eks_node_max_size     = 4                   # Maximum number of EKS worker nodes
+eks_node_min_size     = 1                   # Minimum number of EKS worker nodes
+
+# -----------------------------------------------------------------------------
+# Network Configuration
+# -----------------------------------------------------------------------------
+vpc_cidr = "10.1.0.0/16"                   # CIDR block for VPC (different from dev)
+
+# -----------------------------------------------------------------------------
+# Staging-Specific Configuration
+# -----------------------------------------------------------------------------
+# Enable staging features
+enable_debug_logging = false
+enable_dev_tools     = false
+enable_monitoring    = true
+
+# Resource limits for staging
+resource_limits = {
+  cpu    = "2"
+  memory = "4Gi"
+}
+
+# Staging tags
+tags = {
+  Environment = "staging"
+  Project     = "comind-ops"
+  ManagedBy   = "terraform"
+  CostCenter  = "engineering"
+  Owner       = "qa-team"
+}
+
+# -----------------------------------------------------------------------------
+# High Availability Configuration
+# -----------------------------------------------------------------------------
+# Enable multi-AZ deployment
+availability_zones = ["us-west-2a", "us-west-2b"]
+
+# Enable backup and monitoring
+enable_backup = true
+enable_monitoring = true

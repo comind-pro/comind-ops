@@ -1,0 +1,98 @@
+# =============================================================================
+# AWS Environment Configuration Example
+# =============================================================================
+# This file contains example configuration values for the AWS EKS environment.
+# Copy this file to terraform.tfvars and modify the values as needed.
+
+# -----------------------------------------------------------------------------
+# Basic Configuration
+# -----------------------------------------------------------------------------
+cluster_name = "comind-ops-dev"             # Name of the EKS cluster
+environment  = "dev"                        # Environment name (dev, stage, prod)
+
+# -----------------------------------------------------------------------------
+# AWS Configuration
+# -----------------------------------------------------------------------------
+aws_region = "us-west-2"                    # AWS region for resources
+
+# -----------------------------------------------------------------------------
+# EKS Cluster Configuration
+# -----------------------------------------------------------------------------
+eks_cluster_version = "1.28"                # Kubernetes version for EKS cluster
+
+# -----------------------------------------------------------------------------
+# EKS Node Group Configuration
+# -----------------------------------------------------------------------------
+eks_node_instance_type = "t3.medium"         # Instance type for EKS worker nodes
+eks_node_desired_size = 2                   # Desired number of EKS worker nodes
+eks_node_max_size     = 4                   # Maximum number of EKS worker nodes
+eks_node_min_size     = 1                   # Minimum number of EKS worker nodes
+
+# -----------------------------------------------------------------------------
+# Network Configuration
+# -----------------------------------------------------------------------------
+vpc_cidr = "10.0.0.0/16"                   # CIDR block for VPC
+
+# -----------------------------------------------------------------------------
+# Advanced Configuration (Optional)
+# -----------------------------------------------------------------------------
+# Uncomment and modify these if you need to override defaults:
+
+# # Additional availability zones
+# # availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
+# 
+# # Custom VPC configuration
+# # vpc_config = {
+# #   enable_nat_gateway = true
+# #   enable_vpn_gateway = false
+# #   enable_dns_hostnames = true
+# #   enable_dns_support   = true
+# # }
+# 
+# # EKS add-ons configuration
+# # eks_addons = {
+# #   coredns = {
+# #     version = "v1.10.1-eksbuild.1"
+# #   }
+# #   kube_proxy = {
+# #     version = "v1.28.1-eksbuild.1"
+# #   }
+# #   vpc_cni = {
+# #     version = "v1.14.1-eksbuild.1"
+# #   }
+# # }
+# 
+# # Node group configuration
+# # node_group_config = {
+# #   disk_size = 20
+# #   ami_type  = "AL2_x86_64"
+# #   capacity_type = "ON_DEMAND"
+# # }
+# 
+# # Security group rules
+# # security_group_rules = {
+# #   allow_all_egress = true
+# #   allow_ssh_access = false
+# #   ssh_cidr_blocks  = ["0.0.0.0/0"]
+# # }
+# 
+# # Tags for all resources
+# # tags = {
+# #   Environment = "dev"
+# #   Project     = "comind-ops"
+# #   ManagedBy   = "terraform"
+# # }
+
+# =============================================================================
+# Usage Instructions:
+# =============================================================================
+# 1. Copy this file: cp terraform.tfvars.example terraform.tfvars
+# 2. Modify the values in terraform.tfvars according to your needs
+# 3. Ensure AWS credentials are configured:
+#    - AWS CLI: aws configure
+#    - Environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+#    - IAM roles (if running on EC2)
+# 4. Run: make bootstrap PROFILE=aws
+# 5. Update kubeconfig: aws eks update-kubeconfig --region us-west-2 --name comind-ops-dev
+# 6. Access your cluster: kubectl get nodes
+# =============================================================================

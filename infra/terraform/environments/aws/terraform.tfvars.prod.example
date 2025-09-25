@@ -1,0 +1,87 @@
+# =============================================================================
+# Production Environment Configuration Example
+# =============================================================================
+# This file contains configuration values for the production environment.
+# Copy this file to terraform.tfvars and modify the values as needed.
+
+# -----------------------------------------------------------------------------
+# Environment Configuration
+# -----------------------------------------------------------------------------
+environment  = "prod"                       # Environment name
+cluster_name = "comind-ops-prod"            # Name of the cluster
+
+# -----------------------------------------------------------------------------
+# AWS Configuration
+# -----------------------------------------------------------------------------
+aws_region = "us-west-2"                    # AWS region for resources
+
+# -----------------------------------------------------------------------------
+# EKS Cluster Configuration (Production)
+# -----------------------------------------------------------------------------
+eks_cluster_version = "1.28"                # Kubernetes version for EKS cluster
+
+# -----------------------------------------------------------------------------
+# EKS Node Group Configuration (Production - Large instances)
+# -----------------------------------------------------------------------------
+eks_node_instance_type = "t3.large"         # Instance type for EKS worker nodes (larger for prod)
+eks_node_desired_size = 3                   # Desired number of EKS worker nodes
+eks_node_max_size     = 10                   # Maximum number of EKS worker nodes
+eks_node_min_size     = 3                   # Minimum number of EKS worker nodes
+
+# -----------------------------------------------------------------------------
+# Network Configuration
+# -----------------------------------------------------------------------------
+vpc_cidr = "10.2.0.0/16"                   # CIDR block for VPC (different from dev/stage)
+
+# -----------------------------------------------------------------------------
+# Production-Specific Configuration
+# -----------------------------------------------------------------------------
+# Enable production features
+enable_debug_logging = false
+enable_dev_tools     = false
+enable_monitoring    = true
+enable_logging       = true
+
+# Resource limits for production
+resource_limits = {
+  cpu    = "4"
+  memory = "8Gi"
+}
+
+# Production tags
+tags = {
+  Environment = "production"
+  Project     = "comind-ops"
+  ManagedBy   = "terraform"
+  CostCenter  = "engineering"
+  Owner       = "ops-team"
+  Compliance  = "required"
+}
+
+# -----------------------------------------------------------------------------
+# High Availability Configuration
+# -----------------------------------------------------------------------------
+# Enable multi-AZ deployment
+availability_zones = ["us-west-2a", "us-west-2b", "us-west-2c"]
+
+# Enable backup and monitoring
+enable_backup = true
+enable_monitoring = true
+enable_logging = true
+
+# -----------------------------------------------------------------------------
+# Security Configuration
+# -----------------------------------------------------------------------------
+# Enable security features
+enable_encryption = true
+enable_network_policies = true
+enable_pod_security_policies = true
+
+# -----------------------------------------------------------------------------
+# Backup Configuration
+# -----------------------------------------------------------------------------
+backup_config = {
+  retention_days = 30
+  schedule = "0 2 * * *"  # Daily at 2 AM
+  cross_region_backup = true
+}

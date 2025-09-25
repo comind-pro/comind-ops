@@ -128,9 +128,9 @@ module "database" {
   kubernetes_namespace = kubernetes_namespace.app.metadata[0].name
 
   database_config   = var.database
-  database_name     = local.database_name
-  database_username = local.database_username
-  database_password = random_password.database_password[0].result
+  database_name     = var.database.username != null ? var.database.database_name : local.database_name
+  database_username = var.database.username != null ? var.database.username : local.database_username
+  database_password = var.database.password != null ? var.database.password : random_password.database_password[0].result
 
   tags = local.common_tags
 }
@@ -381,7 +381,6 @@ resource "kubernetes_network_policy" "app" {
 
     # Allow egress to internet (DNS, external APIs)
     egress {
-      to {}
       ports {
         protocol = "UDP"
         port     = "53"
@@ -389,7 +388,6 @@ resource "kubernetes_network_policy" "app" {
     }
 
     egress {
-      to {}
       ports {
         protocol = "TCP"
         port     = "443"

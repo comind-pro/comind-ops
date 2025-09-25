@@ -1,0 +1,55 @@
+# =============================================================================
+# Local Environment Configuration Example
+# =============================================================================
+# This file contains example configuration values for the local k3d environment.
+# Copy this file to terraform.tfvars and modify the values as needed.
+
+# -----------------------------------------------------------------------------
+# Cluster Configuration
+# -----------------------------------------------------------------------------
+cluster_name       = "comind-ops-dev"        # Name of the k3d cluster
+cluster_port       = 6443                   # Port to expose the cluster API
+environment        = "dev"                  # Environment name (dev, stage, prod)
+
+# -----------------------------------------------------------------------------
+# Ingress Configuration
+# -----------------------------------------------------------------------------
+ingress_http_port  = 8080                   # HTTP port for ingress (maps to k3d loadbalancer)
+ingress_https_port = 8443                   # HTTPS port for ingress (maps to k3d loadbalancer)
+
+# -----------------------------------------------------------------------------
+# Registry Configuration
+# -----------------------------------------------------------------------------
+registry_port      = 5000                   # Port for local docker registry (not used in k3d setup)
+
+# -----------------------------------------------------------------------------
+# Advanced Configuration (Optional)
+# -----------------------------------------------------------------------------
+# Uncomment and modify these if you need to override defaults:
+
+# cluster_type      = "local"               # Type of cluster (local, aws, ci)
+# 
+# # Custom domain for local development
+# # custom_domain    = "mycompany.local"
+# 
+# # Resource limits for local development
+# # resource_limits = {
+# #   cpu    = "2"
+# #   memory = "4Gi"
+# # }
+# 
+# # Additional k3d arguments
+# # k3d_extra_args = [
+# #   "--k3s-arg=--disable=traefik@server:0",
+# #   "--k3s-arg=--disable=servicelb@server:0"
+# # ]
+
+# =============================================================================
+# Usage Instructions:
+# =============================================================================
+# 1. Copy this file: cp terraform.tfvars.example terraform.tfvars
+# 2. Modify the values in terraform.tfvars according to your needs
+# 3. Run: make bootstrap PROFILE=local
+# 4. Access your cluster at: https://localhost:6443
+# 5. Access applications via: http://app.dev.127.0.0.1.nip.io:8080
+# =============================================================================
