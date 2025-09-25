@@ -6,6 +6,7 @@ ENV ?= dev
 APP ?= sample-app
 COMMAND ?= plan
 TEAM ?= platform
+PROFILE ?= local
 
 # Colors for output
 BLUE := \033[0;34m
@@ -36,11 +37,14 @@ help: ## Show this help message
 	@echo "  APP        Application name [default: $(APP)]"
 	@echo "  COMMAND    Terraform command [default: $(COMMAND)]"
 	@echo "  TEAM       Team name [default: $(TEAM)]"
+	@echo "  PROFILE    Infrastructure profile (local, aws) [default: $(PROFILE)]"
 	@echo ""
 	@echo "$(GREEN)💡 Examples:$(NC)"
+	@echo "  make bootstrap PROFILE=aws"
 	@echo "  make new-app-full APP=payment-api TEAM=backend"
 	@echo "  make tf-apply-app APP=payment-api"
-	@echo "  make tf ENV=prod APP=my-app COMMAND=apply"
+	@echo "  make tf ENV=prod APP=my-app COMMAND=apply PROFILE=aws"
+	@echo "  make clean-env                  # Complete environment cleanup"
 	@echo "  make seal APP=my-app ENV=stage FILE=secret.yaml"
 
 # ===========================================
@@ -53,11 +57,15 @@ bootstrap: ## Complete cluster setup (core infrastructure + platform services)
 	@echo "$(YELLOW)Step 1/7: Checking dependencies...$(NC)"
 	@./scripts/check-deps.sh
 	@echo "$(YELLOW)Step 2/7: Starting external services...$(NC)"
-	@$(MAKE) --no-print-directory services-setup
+	@if [ "$(PROFILE)" = "local" ]; then \
+		$(MAKE) --no-print-directory services-setup; \
+	else \
+		echo "$(BLUE)Skipping Docker services for $(PROFILE) profile - using cloud services$(NC)"; \
+	fi
 	@echo "$(YELLOW)Step 3/7: Initializing Terraform...$(NC)"
-	@terraform -chdir=infra/terraform/core init
+	@terraform -chdir=infra/terraform/environments/$(PROFILE) init
 	@echo "$(YELLOW)Step 4/7: Deploying core infrastructure...$(NC)"
-	@./scripts/tf.sh $(ENV) core apply --auto-approve
+	@./scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE)
 	@echo "$(YELLOW)Step 5/7: Waiting for cluster to be ready...$(NC)"
 	@sleep 30
 	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || echo "ArgoCD still starting..."
@@ -126,7 +134,7 @@ cleanup: ## Destroy cluster and cleanup resources (⚠️  DESTRUCTIVE)
 	@echo "$(YELLOW)Cleaning up comind-ops Platform...$(NC)"
 	@kubectl delete -k k8s/platform/ --ignore-not-found=true
 	@kubectl delete -k k8s/base/ --ignore-not-found=true
-	@./scripts/tf.sh $(ENV) core destroy --auto-approve
+	@./scripts/tf.sh $(ENV) core destroy --auto-approve --profile $(PROFILE)
 	@echo "$(GREEN)✅ Cleanup complete$(NC)"
 
 # ===========================================
@@ -170,7 +178,7 @@ new-app: ## Create new application (APP=name TEAM=team)
 .PHONY: new-app-full
 new-app-full: ## Create application with full infrastructure (APP=name TEAM=team)
 	@echo "$(BLUE)📱 Creating application $(APP) with infrastructure...$(NC)"
-	@./scripts/new-app.sh $(APP) --team $(TEAM) --with-database --with-storage --with-queue --with-terraform
+	@./scripts/new-app.sh $(APP) --team $(TEAM) --with-database --with-queue --with-terraform
 	@echo "$(GREEN)✅ Application $(APP) created with complete infrastructure!$(NC)"
 	@echo ""
 	@echo "$(YELLOW)Next steps:$(NC)"
@@ -222,9 +230,9 @@ seal: ## Seal secret for GitOps (APP=name ENV=env FILE=secret.yaml)
 # ===========================================
 
 .PHONY: tf
-tf: ## Run Terraform command (ENV=env APP=app COMMAND=plan)
-	@echo "$(BLUE)🏗️  Running Terraform $(COMMAND) for $(APP) in $(ENV)$(NC)"
-	@./scripts/tf.sh $(ENV) $(APP) $(COMMAND)
+tf: ## Run Terraform command (ENV=env APP=app COMMAND=plan PROFILE=profile)
+	@echo "$(BLUE)🏗️  Running Terraform $(COMMAND) for $(APP) in $(ENV) [$(PROFILE)]$(NC)"
+	@./scripts/tf.sh $(ENV) $(APP) $(COMMAND) --profile $(PROFILE)
 
 .PHONY: tf-plan
 tf-plan: ## Plan Terraform changes (ENV=env APP=app)
@@ -241,45 +249,45 @@ tf-output: ## Show Terraform outputs (ENV=env APP=app)
 # Application-specific Terraform commands
 .PHONY: tf-init-app
 tf-init-app: ## Initialize Terraform for application (APP=name)
-	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP). Run: make new-app-full APP=$(APP)$(NC)"; exit 1; fi
+	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP). Run: make new-app-full APP=$(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)🔧 Initializing Terraform for $(APP)...$(NC)"
-	@cd infra/terraform/apps/$(APP) && terraform init
+	@cd k8s/apps/$(APP)/terraform && terraform init
 
 .PHONY: tf-plan-app  
 tf-plan-app: ## Plan Terraform for application (APP=name)
-	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
+	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)📋 Planning Terraform changes for $(APP)...$(NC)"
-	@cd infra/terraform/apps/$(APP) && terraform plan
+	@cd k8s/apps/$(APP)/terraform && terraform plan
 
 .PHONY: tf-apply-app
 tf-apply-app: ## Apply Terraform for application (APP=name)
-	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
+	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)🚀 Applying Terraform for $(APP)...$(NC)"
-	@cd infra/terraform/apps/$(APP) && terraform apply
+	@cd k8s/apps/$(APP)/terraform && terraform apply
 
 .PHONY: tf-destroy-app
 tf-destroy-app: ## Destroy Terraform resources for application (APP=name)
-	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
+	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(YELLOW)⚠️  This will destroy all infrastructure for $(APP). Are you sure? (y/N)$(NC)"
 	@read -r confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "Cancelled." && exit 1)
-	@cd infra/terraform/apps/$(APP) && terraform destroy
+	@cd k8s/apps/$(APP)/terraform && terraform destroy
 
 .PHONY: tf-output-app
 tf-output-app: ## Show Terraform outputs for application (APP=name)
-	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
+	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)📤 Terraform outputs for $(APP):$(NC)"
-	@cd infra/terraform/apps/$(APP) && terraform output
+	@cd k8s/apps/$(APP)/terraform && terraform output
 
 .PHONY: tf-status-app
 tf-status-app: ## Show Terraform status for application (APP=name)
-	@if [ ! -d "infra/terraform/apps/$(APP)" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
+	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)📊 Terraform status for $(APP):$(NC)"
-	@cd infra/terraform/apps/$(APP) && terraform show -json | jq -r '.values.root_module.resources[] | select(.type != "random_password") | "\(.type).\(.name): \(.values.metadata[0].name // .values.name // "N/A")"' 2>/dev/null || echo "No resources provisioned yet"
+	@cd k8s/apps/$(APP)/terraform && terraform show -json | jq -r '.values.root_module.resources[] | select(.type != "random_password") | "\(.type).\(.name): \(.values.metadata[0].name // .values.name // "N/A")"' 2>/dev/null || echo "No resources provisioned yet"
 
 .PHONY: tf-list-apps
 tf-list-apps: ## List applications with Terraform configurations
 	@echo "$(BLUE)📋 Applications with Terraform infrastructure:$(NC)"
-	@find infra/terraform/apps -name "main.tf" -exec dirname {} \; | sed 's|infra/terraform/apps/||g' | sort || echo "No Terraform applications found"
+	@find k8s/apps -path "*/terraform/main.tf" -exec dirname {} \; | sed 's|k8s/apps/||g' | sed 's|/terraform||g' | sort || echo "No Terraform applications found"
 
 # ===========================================
 # 🚀 DEPLOYMENT & OPERATIONS
@@ -322,10 +330,10 @@ status: ## Show overall platform status
 .PHONY: validate
 validate: ## Validate all configurations
 	@echo "$(BLUE)✅ Validating platform configurations...$(NC)"
-	@echo "$(YELLOW)Initializing Terraform...$(NC)"
-	@terraform -chdir=infra/terraform/core init -upgrade > /dev/null 2>&1 || true
+	@echo "$(YELLOW)Initializing Terraform for $(PROFILE) profile...$(NC)"
+	@terraform -chdir=infra/terraform/environments/$(PROFILE) init -upgrade > /dev/null 2>&1 || true
 	@echo "$(YELLOW)Validating Terraform...$(NC)"
-	@terraform -chdir=infra/terraform/core validate
+	@terraform -chdir=infra/terraform/environments/$(PROFILE) validate
 	@echo "$(YELLOW)Validating Kubernetes manifests...$(NC)"
 	@find k8s -name "*.yaml" -exec kubectl apply --dry-run=client -f {} \; > /dev/null 2>&1 || echo "⚠️  Some manifests require cluster access"
 	@echo "$(YELLOW)Validating Helm charts...$(NC)"
@@ -336,7 +344,8 @@ validate: ## Validate all configurations
 lint: ## Lint all code and configurations
 	@echo "$(BLUE)🧹 Linting platform code...$(NC)"
 	@echo "$(YELLOW)Formatting Terraform...$(NC)"
-	@terraform -chdir=infra/terraform/core fmt -recursive
+	@terraform -chdir=infra/terraform/environments/$(PROFILE) fmt -recursive
+	@find infra/terraform/environments -name "*.tf" -exec terraform fmt {} \;
 	@echo "$(YELLOW)Linting shell scripts...$(NC)"
 	@find scripts -name "*.sh" -exec shellcheck {} \; || true
 	@echo "$(GREEN)✅ Linting complete$(NC)"
@@ -452,3 +461,11 @@ heal-services: ## Fix common service issues automatically
 	@echo "✅ Service healing completed"
 
 .PHONY: heal-services
+
+.PHONY: clean-env
+clean-env: ## Complete environment cleanup (terraform, docker, k3d) - DESTRUCTIVE!
+	@echo "$(RED)⚠️  WARNING: This will completely clean your development environment!$(NC)"
+	@./scripts/clean-env.sh
+
+.PHONY: clean-all
+clean-all: clean-env ## Alias for clean-env

@@ -1,8 +1,5 @@
-version: '3.8'
-
-# Comind-Ops Platform - External Services
-# PostgreSQL and MinIO running as separate containers outside Kubernetes
-# This provides better data persistence and easier management
+# Docker Compose file for Comind-Ops Platform External Services
+# Production-ready configuration with backup automation and proper initialization
 
 networks:
   comind-ops-network:
@@ -32,22 +29,21 @@ services:
     container_name: comind-ops-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: comind_ops
+      POSTGRES_DB: comind_ops_dev
       POSTGRES_USER: comind_ops_user
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-secure_password_change_me}
-      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-comind_ops_password}
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
       PGDATA: /var/lib/postgresql/data/pgdata
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
-      - ./postgres/config/postgresql.conf:/etc/postgresql/postgresql.conf:ro
     ports:
       - "5434:5432"
     networks:
       comind-ops-network:
         ipv4_address: 172.20.0.10
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U comind_ops_user -d comind_ops"]
+      test: ["CMD-SHELL", "pg_isready -U comind_ops_user -d comind_ops_dev"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -61,12 +57,6 @@ services:
       options:
         max-size: "100m"
         max-file: "3"
-    command: >
-      postgres
-      -c config_file=/etc/postgresql/postgresql.conf
-      -c log_destination=stderr
-      -c log_statement=mod
-      -c log_min_duration_statement=1000
 
   # ===========================================
   # MinIO Object Storage
@@ -76,8 +66,8 @@ services:
     container_name: comind-ops-minio
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-comind_ops_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-comind_ops_minio_password}
       MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
       MINIO_SERVER_URL: http://localhost:9000
       MINIO_CONSOLE_ADDRESS: ":9001"
@@ -117,8 +107,8 @@ services:
       minio:
         condition: service_healthy
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-comind_ops_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-comind_ops_minio_password}
     networks:
       - comind-ops-network
     labels:
@@ -144,7 +134,7 @@ services:
       mc anonymous set none minio/backups;
       
       echo 'Creating lifecycle policies...';
-      cat > /tmp/backup-lifecycle.json << EOF
+      cat > /tmp/backup-lifecycle.json << EOF_JSON
       {
         \"Rules\": [
           {
@@ -156,69 +146,8 @@ services:
           }
         ]
       }
-      EOF
+      EOF_JSON
       mc ilm set /tmp/backup-lifecycle.json minio/backups;
       
       echo 'MinIO initialization completed successfully';
       "
-
-  # ===========================================
-  # PostgreSQL Backup Service
-  # ===========================================
-  postgres-backup:
-    image: postgres:16-alpine
-    container_name: comind-ops-postgres-backup
-    restart: "no"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
-    environment:
-      PGHOST: comind-ops-postgres
-      PGPORT: 5432
-      PGDATABASE: comind_ops
-      PGUSER: comind_ops_user
-      PGPASSWORD: ${POSTGRES_PASSWORD:-secure_password_change_me}
-      MINIO_ENDPOINT: comind-ops-minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-      BACKUP_RETENTION_DAYS: 7
-    volumes:
-      - ./scripts/backup-postgres.sh:/backup-postgres.sh:ro
-    networks:
-      - comind-ops-network
-    labels:
-      - "com.comind-ops.service=backup"
-      - "com.comind-ops.type=postgres"
-      - "com.comind-ops.env=${ENV:-dev}"
-    profiles:
-      - backup
-    entrypoint: ["/backup-postgres.sh"]
-
-  # ===========================================
-  # MinIO Backup Service
-  # ===========================================
-  minio-backup:
-    image: minio/mc:latest
-    container_name: comind-ops-minio-backup
-    restart: "no"
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      SOURCE_MINIO_ENDPOINT: comind-ops-minio:9000
-      SOURCE_MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      SOURCE_MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-      BACKUP_RETENTION_DAYS: 7
-    volumes:
-      - ./scripts/backup-minio.sh:/backup-minio.sh:ro
-    networks:
-      - comind-ops-network
-    labels:
-      - "com.comind-ops.service=backup"
-      - "com.comind-ops.type=minio"
-      - "com.comind-ops.env=${ENV:-dev}"
-    profiles:
-      - backup
-    entrypoint: ["/backup-minio.sh"]

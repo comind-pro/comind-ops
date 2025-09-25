@@ -308,8 +308,15 @@ heal_services() {
     log "🔧 Auto-healing external services..."
     local healing_performed=false
     
-    # Ensure variables are set
-    check_config || return 1
+    # Ensure variables are set (inline config check)
+    if [ -z "$DOCKER_COMPOSE_FILE" ]; then
+        export DOCKER_COMPOSE_FILE="$PROJECT_ROOT/infra/docker/docker-compose.yml"
+    fi
+    
+    if [ -z "$PROJECT_ROOT" ]; then
+        export PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+        export DOCKER_COMPOSE_FILE="$PROJECT_ROOT/infra/docker/docker-compose.yml"
+    fi
     
     # Check for PostgreSQL config errors and auto-fix
     local pg_logs=$(docker compose -f "$DOCKER_COMPOSE_FILE" logs postgres 2>&1 || echo "")

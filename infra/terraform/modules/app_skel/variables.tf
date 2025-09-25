@@ -57,6 +57,9 @@ variable "database" {
     # Local k3d configuration
     local_storage_size  = optional(string, "10Gi")
     local_replica_count = optional(number, 1)
+    # External service configuration for local development
+    external_host = optional(string, "localhost")
+    external_port = optional(number, 5432)
   })
   default = {
     enabled = false

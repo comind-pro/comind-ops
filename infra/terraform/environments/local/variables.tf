@@ -1,4 +1,4 @@
-# Variables for core infrastructure
+# Variables for local environment
 
 variable "cluster_name" {
   description = "Name of the k3d cluster"
@@ -34,14 +34,4 @@ variable "environment" {
   description = "Environment name (dev, stage, prod)"
   type        = string
   default     = "dev"
-}
-
-variable "cluster_type" {
-  description = "Type of cluster deployment (local, aws, digitalocean)"
-  type        = string
-  default     = "local"
-  validation {
-    condition     = contains(["local", "aws", "digitalocean", "ci"], var.cluster_type)
-    error_message = "Cluster type must be one of: local, aws, digitalocean, ci."
-  }
 }

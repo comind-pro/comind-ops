@@ -95,10 +95,10 @@ spec:
               value: /var/lib/registry
           securityContext:
             allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-          capabilities:
-            drop:
-              - ALL
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           resources:
             requests:
               memory: "256Mi"
@@ -188,12 +188,12 @@ spec:
       http:
         paths:
           - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: docker-registry
-            port:
-              number: 5000
+            pathType: Prefix
+            backend:
+              service:
+                name: docker-registry
+                port:
+                  number: 5000
 ---
 # Registry Auth Secret Template (to be sealed)
 apiVersion: v1

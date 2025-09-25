@@ -48,7 +48,17 @@ output "storage" {
     service_port = module.storage[0].service_port
     secure       = module.storage[0].secure_connection
     } : {
-    enabled = false
+    enabled      = false
+    endpoint     = null
+    access_key   = null
+    secret_key   = null
+    bucket_names = []
+    bucket_urls  = []
+    console_url  = null
+    region       = null
+    service_name = null
+    service_port = null
+    secure       = null
   }
   sensitive = true
 }
@@ -62,7 +72,10 @@ output "queue" {
     queue_urls = module.queue[0].queue_urls
     queues     = [for q in var.queue.queues : q.name]
     } : {
-    enabled = false
+    enabled    = false
+    endpoint   = null
+    queue_urls = []
+    queues     = []
   }
 }
 

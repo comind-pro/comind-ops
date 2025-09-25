@@ -13,7 +13,7 @@ spec:
     matchLabels:
       app: elasticmq
   template:
-      metadata:
+    metadata:
       labels:
         app: elasticmq
         component: queue
@@ -41,7 +41,7 @@ spec:
             readOnlyRootFilesystem: true
             capabilities:
               drop:
-              - ALL
+                - ALL
           resources:
             requests:
               memory: "256Mi"

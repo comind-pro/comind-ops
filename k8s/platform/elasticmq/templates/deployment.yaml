@@ -33,6 +33,8 @@ spec:
                 name: http
                 protocol: TCP
               - containerPort: 9325
+                name: management
+                protocol: TCP
                 name: ui
                 protocol: TCP
             env:

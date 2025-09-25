@@ -27,7 +27,7 @@ patches:
   - target:
       kind: Deployment
       name: elasticmq
-      patch: |-
+    patch: |-
       - op: replace
         path: /spec/replicas
         value: 1
@@ -35,14 +35,14 @@ patches:
         path: /spec/template/spec/containers/0/resources/limits/memory
         value: "512Mi"
 
-    # Registry storage adjustment for dev
-    - target:
-        kind: PersistentVolumeClaim
-        name: registry-storage
-      patch: |-
-        - op: replace
-          path: /spec/resources/requests/storage
-          value: "20Gi"
+  # Registry storage adjustment for dev
+  - target:
+      kind: PersistentVolumeClaim
+      name: registry-storage
+    patch: |-
+      - op: replace
+        path: /spec/resources/requests/storage
+        value: "20Gi"
 
 # Images - pin versions for stability
 images:

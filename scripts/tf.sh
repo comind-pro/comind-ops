@@ -20,13 +20,14 @@ Options:
     --auto-approve  Auto approve for apply/destroy commands
     --var key=value Set Terraform variable
     --workspace WS  Terraform workspace (default: environment name)
+    --profile PROF  Infrastructure profile (local, aws) (default: local)
 
 Examples:
-    $0 dev                           # Plan core infrastructure for dev
-    $0 dev core apply               # Apply core infrastructure  
-    $0 dev my-app plan              # Plan app infrastructure
+    $0 dev core plan --profile local       # Plan local infrastructure for dev
+    $0 dev core apply --profile aws        # Apply AWS infrastructure  
+    $0 dev my-app plan                      # Plan app infrastructure
     $0 prod my-app apply --auto-approve
-    $0 dev my-app output            # Show outputs
+    $0 dev my-app output                    # Show outputs
 EOF
     }
     print_usage
@@ -68,18 +69,20 @@ Options:
     --var-file FILE Use specific tfvars file
     --target RES    Target specific resource
     --workspace WS  Use specific terraform workspace
+    --profile PROF  Infrastructure profile (local, aws) (default: local)
 
 Examples:
-    $0 dev core plan                    # Plan core infrastructure for dev
-    $0 dev core apply                   # Apply core infrastructure for dev  
-    $0 dev my-app plan                  # Plan app-specific resources
-    $0 dev my-app apply --auto-approve  # Apply with auto-approval
-    $0 prod my-app destroy              # Destroy app resources in prod
+    $0 dev core plan --profile local       # Plan local core infrastructure for dev
+    $0 dev core apply --profile aws        # Apply AWS core infrastructure for dev  
+    $0 dev my-app plan                      # Plan app-specific resources
+    $0 dev my-app apply --auto-approve      # Apply with auto-approval
+    $0 prod my-app destroy                  # Destroy app resources in prod
 
 Terraform Directories:
-    Core: infra/terraform/core/
-    Apps: k8s/apps/<app-name>/terraform/
-    Envs: infra/terraform/envs/<env>/platform/
+    Core (Local): infra/terraform/environments/local/
+    Core (AWS):   infra/terraform/environments/aws/
+    Apps:         k8s/apps/<app-name>/terraform/
+    Envs:         infra/terraform/envs/<env>/platform/
 EOF
 }
 
@@ -93,6 +96,7 @@ AUTO_APPROVE=false
 VAR_FILE=""
 TARGET=""
 WORKSPACE=""
+PROFILE="local"
 
 # Parse command line arguments
 shift 3 # Remove positional arguments
@@ -103,6 +107,7 @@ while [[ $# -gt 0 ]]; do
         --var-file) VAR_FILE="$2"; shift 2 ;;
         --target) TARGET="$2"; shift 2 ;;
         --workspace) WORKSPACE="$2"; shift 2 ;;
+        --profile) PROFILE="$2"; shift 2 ;;
         *) error "Unknown option: $1"; print_usage; exit 1 ;;
     esac
 done
@@ -120,13 +125,24 @@ if [[ ! "$ENVIRONMENT" =~ ^(dev|stage|prod)$ ]]; then
     exit 1
 fi
 
+if [[ ! "$PROFILE" =~ ^(local|aws)$ ]]; then
+    error "Profile must be one of: local, aws"
+    exit 1
+fi
+
 # Determine Terraform directory
 if [[ "$APP_NAME" == "core" ]]; then
-    TF_DIR="$PROJECT_ROOT/infra/terraform/core"
-elif [[ -d "$PROJECT_ROOT/infra/terraform/envs/$ENVIRONMENT/$APP_NAME" ]]; then
-    TF_DIR="$PROJECT_ROOT/infra/terraform/envs/$ENVIRONMENT/$APP_NAME"
+    # Use new environments structure for core infrastructure
+    TF_DIR="$PROJECT_ROOT/infra/terraform/environments/$PROFILE"
+    if [[ ! -d "$TF_DIR" ]]; then
+        error "Terraform environment directory not found: $TF_DIR"
+        error "Available profiles: local, aws"
+        exit 1
+    fi
 elif [[ -d "$PROJECT_ROOT/k8s/apps/$APP_NAME/terraform" ]]; then
     TF_DIR="$PROJECT_ROOT/k8s/apps/$APP_NAME/terraform"
+elif [[ -d "$PROJECT_ROOT/infra/terraform/envs/$ENVIRONMENT/$APP_NAME" ]]; then
+    TF_DIR="$PROJECT_ROOT/infra/terraform/envs/$ENVIRONMENT/$APP_NAME"
 else
     error "Terraform directory not found for app: $APP_NAME"
     exit 1
@@ -138,7 +154,7 @@ if ! command -v terraform &> /dev/null; then
     exit 1
 fi
 
-log "Running Terraform $COMMAND for $APP_NAME in $ENVIRONMENT"
+log "Running Terraform $COMMAND for $APP_NAME in $ENVIRONMENT [$PROFILE profile]"
 log "Directory: $TF_DIR"
 
 # Change to terraform directory and run
@@ -147,6 +163,11 @@ cd "$TF_DIR"
 # Set environment variables
 export TF_VAR_environment="$ENVIRONMENT"
 export TF_VAR_app_name="$APP_NAME"
+# For core infrastructure, the profile determines the directory
+# App-specific terraform may still need cluster_type
+if [[ "$APP_NAME" != "core" ]]; then
+    export TF_VAR_cluster_type="$PROFILE"
+fi
 
 # Set workspace
 if [[ -z "$WORKSPACE" ]]; then
@@ -190,7 +211,7 @@ case "$COMMAND" in
                 exit 0
             fi
         fi
-        terraform apply "${TF_ARGS[@]}"
+        terraform apply "${TF_ARGS[@]:+${TF_ARGS[@]}}"
         success "✅ Terraform apply completed!"
         ;;
     "destroy")
@@ -202,11 +223,11 @@ case "$COMMAND" in
                 exit 0
             fi
         fi
-        terraform destroy "${TF_ARGS[@]}"
+        terraform destroy "${TF_ARGS[@]:+${TF_ARGS[@]}}"
         success "✅ Terraform destroy completed!"
         ;;
     *)
-        terraform "$COMMAND" "${TF_ARGS[@]}"
+        terraform "$COMMAND" "${TF_ARGS[@]:+${TF_ARGS[@]}}"
         ;;
 esac
 

@@ -1,4 +1,4 @@
-# Outputs for core infrastructure
+# Outputs for local environment
 
 output "cluster_name" {
   description = "Name of the k3d cluster"
@@ -25,14 +25,14 @@ output "ingress_endpoints" {
 
 output "argocd_endpoint" {
   description = "ArgoCD web UI endpoint"
-  value       = "http://argocd.${var.environment}.127.0.0.1.nip.io:${var.ingress_http_port}"
+  value       = "http://argocd-${var.environment}.127.0.0.1.nip.io:${var.ingress_http_port}"
 }
 
 output "argocd_credentials" {
   description = "ArgoCD admin credentials"
   value = {
     username = "admin"
-    password = try(data.external.argocd_password.result.password, "admin")
+    password = data.external.argocd_password.result.password
   }
   sensitive  = true
   depends_on = [null_resource.wait_for_argocd]
@@ -50,11 +50,16 @@ output "namespaces_created" {
 
 output "external_services_status" {
   description = "Status of external services (PostgreSQL, MinIO)"
-  value = var.cluster_type == "local" ? {
+  value = {
     postgres_status = data.external.external_services_check.result["postgres_status"]
     postgres_health = data.external.external_services_check.result["postgres_health"]
     minio_status    = data.external.external_services_check.result["minio_status"]
     minio_health    = data.external.external_services_check.result["minio_health"]
     services_ready  = data.external.external_services_check.result["services_ready"]
-  } : null
+  }
+}
+
+output "environment_type" {
+  description = "Environment type"
+  value       = "local"
 }

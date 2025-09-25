@@ -153,13 +153,13 @@ EOF
 create_terraform_config() {
     log "🏗️ Creating Terraform infrastructure configuration..."
     
-    local terraform_dir="infra/terraform/apps/${APP_NAME}"
+    local terraform_dir="k8s/apps/${APP_NAME}/terraform"
     local terraform_file="${terraform_dir}/main.tf"
     
     mkdir -p "$terraform_dir"
     
     # Generate main.tf with app_skel module
-    cat > "$terraform_file" << 'TF_EOF'
+    cat > "$terraform_file" << TF_EOF
 # Terraform configuration for ${APP_NAME} application infrastructure
 
 terraform {
@@ -183,6 +183,16 @@ provider "kubernetes" {
   config_context = "k3d-comind-ops-dev"
 }
 
+# AWS provider (required by modules but not used in local environment)
+provider "aws" {
+  region                      = "us-east-1"
+  skip_credentials_validation = true
+  skip_requesting_account_id  = true
+  skip_metadata_api_check     = true
+  access_key                  = "mock"
+  secret_key                  = "mock"
+}
+
 provider "helm" {
   kubernetes {
     config_path    = "~/.kube/config"
@@ -192,7 +202,7 @@ provider "helm" {
 
 # Development environment
 module "${APP_NAME}_dev" {
-  source = "../../../modules/app_skel"
+  source = "../../../../infra/terraform/modules/app_skel"
   
   # Basic configuration
   app_name     = "${APP_NAME}"
@@ -202,9 +212,9 @@ module "${APP_NAME}_dev" {
   
   # Database configuration
   database = {
-    enabled             = ${DATABASE,,}
-    local_storage_size  = ${DATABASE,,} ? "10Gi" : null
-    local_replica_count = ${DATABASE,,} ? 1 : null
+    enabled             = ${DATABASE}
+    local_storage_size  = ${DATABASE} ? "10Gi" : null
+    local_replica_count = ${DATABASE} ? 1 : null
   }
   
   # Storage configuration
@@ -224,8 +234,8 @@ module "${APP_NAME}_dev" {
   
   # Queue configuration
   queue = {
-    enabled = ${QUEUE,,}
-    queues = ${QUEUE,,} ? [
+    enabled = ${QUEUE}
+    queues = ${QUEUE} ? [
       {
         name                        = "default"
         delay_seconds              = 0
@@ -238,9 +248,9 @@ module "${APP_NAME}_dev" {
   
   # Cache configuration
   cache = {
-    enabled             = ${CACHE,,}
-    local_storage_size  = ${CACHE,,} ? "5Gi" : null
-    local_replica_count = ${CACHE,,} ? 1 : null
+    enabled             = ${CACHE}
+    local_storage_size  = ${CACHE} ? "5Gi" : null
+    local_replica_count = ${CACHE} ? 1 : null
   }
   
   # Networking configuration
@@ -253,8 +263,8 @@ module "${APP_NAME}_dev" {
   # Monitoring configuration
   monitoring = {
     enabled            = true
-    prometheus_enabled = true
-    grafana_enabled    = true
+    prometheus_enabled = false  # Disabled for local - no Prometheus operator installed
+    grafana_enabled    = false  # Disabled for local
     alerting_enabled   = false
   }
   
@@ -267,10 +277,10 @@ module "${APP_NAME}_dev" {
   
   # Backup configuration
   backup = {
-    enabled                 = ${DATABASE,,}
+    enabled                 = ${DATABASE}
     backup_schedule        = "0 2 * * *"
     retention_days         = 7
-    database_backup_enabled = ${DATABASE,,}
+    database_backup_enabled = ${DATABASE}
     storage_backup_enabled = false
   }
   
@@ -311,7 +321,7 @@ Terraform configuration for provisioning infrastructure for the ${APP_NAME} appl
 
 ```bash
 # Initialize and apply
-cd infra/terraform/apps/${APP_NAME}
+cd k8s/apps/${APP_NAME}/terraform
 terraform init
 terraform plan
 terraform apply
@@ -350,7 +360,7 @@ log "Next steps:"
 log "  1. Customize templates and values"
 log "  2. Create secrets with seal-secret.sh"
 if [[ "$WITH_TERRAFORM" == "true" ]]; then
-    log "  3. Provision infrastructure: cd infra/terraform/apps/$APP_NAME && terraform apply"
+    log "  3. Provision infrastructure: cd k8s/apps/$APP_NAME/terraform && terraform apply"
     log "  4. Build and deploy your application"
 else
     log "  3. Build and deploy your application"

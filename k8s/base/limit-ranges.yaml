@@ -88,20 +88,19 @@ metadata:
   namespace: monitoring
 spec:
   limits:
-  - default:
+  - type: Container
+    default:
       cpu: "1"
       memory: "1Gi"
     defaultRequest:
       cpu: "100m"
       memory: "128Mi"
-    type: Container
-  - max:
+    max:
       cpu: "2"
       memory: "4Gi"
     min:
       cpu: "50m"
       memory: "64Mi"
-    type: Container
 ---
 # LimitRange for backup system
 apiVersion: v1
@@ -117,8 +116,7 @@ spec:
     defaultRequest:
       cpu: "100m"
       memory: "128Mi"
-    type: Container
-  - max:
+    max:
       cpu: "1"
       memory: "2Gi"
     min:

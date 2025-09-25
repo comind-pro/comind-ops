@@ -375,7 +375,6 @@ site/
 # ===================
 # Local state directory (for any local state files)
 .local/
-local/
 
 # Temporary manifest files
 *.tmp.yaml
