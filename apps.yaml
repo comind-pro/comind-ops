@@ -1,118 +1,66 @@
 # Comind-Ops Platform Applications Configuration
-# This file is read by ArgoCD ApplicationSet to automatically deploy applications
+# This file defines all applications and their environment-specific settings
+# Used by ArgoCD ApplicationSet for GitOps deployment
 
-environments:
-  - name: dev
-  - name: stage
-  - name: prod
+# Global Git repository configuration
+repository:
+  url: https://github.com/comind-pro/comind-ops
+  branches:
+    dev: main
+    stage: main  
+    prod: main
+  path: k8s/apps
 
-# Application definitions
-# Each app will be deployed to each environment automatically
-apps:
-  # Sample application demonstrating the pattern
-  - name: sample-app
-    path: k8s/apps/sample-app/chart
-    namespace: sample-app
-    syncWave: 10
+# Infrastructure services configuration
+infrastructure:
+  repository:
+    url: https://github.com/comind-pro/comind-ops
+    branch: main
+    path: k8s
+  services:
+    - name: base
+      path: k8s/base
+      description: "Base Kubernetes resources (RBAC, namespaces, policies)"
+    - name: platform
+      path: k8s/platform
+      description: "Platform services (ElasticMQ, Registry, etc.)"
+
+# Applications
+applications:
+  # Sample Application
+  sample-app:
     description: "Sample application demonstrating the comind-ops platform patterns"
     team: platform
-
-    # Helm configuration
-    helm:
-      values:
-        - k8s/apps/sample-app/values/{{env}}.yaml
-        - k8s/apps/sample-app/secrets/{{env}}.sealed.yaml
-
-    # Environment-specific overrides
+    port: 8080
+    repository:
+      url: https://github.com/comind-pro/comind-ops
+      path: k8s/apps/sample-app
     environments:
       dev:
+        enabled: true
+        branch: main
+        hostname: sample-app.dev.127.0.0.1.nip.io
         replicas: 1
-        resources: small
-        ingress:
-          host: sample-app.dev.127.0.0.1.nip.io
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        database:
+          enabled: true
+          type: postgresql
+          name: sample_app_dev
+        monitoring:
+          enabled: true
       stage:
-        replicas: 1
-        resources: medium
-        ingress:
-          host: sample-app.stage.127.0.0.1.nip.io
-      prod:
+        enabled: false
+        branch: main
+        hostname: sample-app.stage.comind-ops.io
         replicas: 2
-        resources: large
-        ingress:
-          host: sample-app.prod.127.0.0.1.nip.io
-
-# Platform Infrastructure (managed by separate ApplicationSet)
-# These are deployed via the platform-infrastructure ApplicationSet
-infrastructure:
-  # Base Kubernetes resources
-  - name: k8s-base
-    path: k8s/base
-    type: kustomize
-    syncWave: -10
-    description: "Base Kubernetes resources (RBAC, quotas, policies)"
-
-  # Platform services per environment
-  - name: platform-services
-    path: k8s/platform
-    type: kustomize
-    syncWave: 0
-    environments: [dev, stage, prod]
-    description: "Platform services (ElasticMQ, Docker Registry, Backups)"
-
-    services:
-      - name: elasticmq
-        port: 9324
-        ingress: elasticmq.{{env}}.127.0.0.1.nip.io
-        description: "AWS SQS-compatible message queue"
-
-      - name: docker-registry
-        port: 5000
-        ingress: registry.{{env}}.127.0.0.1.nip.io
-        description: "Private container registry with retention"
-
-      - name: postgres-backup
-        schedule: "0 3 * * *"
-        description: "Automated PostgreSQL backup service"
-
-      - name: minio-backup
-        schedule: "0 4 * * *"
-        description: "Automated MinIO backup service"
-
-# Example of how to add more applications
-# Uncomment and modify as needed:
-
-# - name: my-api
-#   path: k8s/apps/my-api/chart
-#   namespace: my-api
-#   syncWave: 20
-#   description: "My custom API service"
-#   team: backend
-#
-#   environments:
-#     dev:
-#       replicas: 1
-#       database: postgres.dev.local
-#     stage:
-#       replicas: 1
-#       database: postgres.stage.local
-#     prod:
-#       replicas: 3
-#       database: postgres.prod.local
-
-# - name: my-frontend
-#   path: k8s/apps/my-frontend/chart
-#   namespace: my-frontend
-#   syncWave: 30
-#   description: "My frontend application"
-#   team: frontend
-#
-#   environments:
-#     dev:
-#       replicas: 1
-#       api_url: http://my-api.dev.127.0.0.1.nip.io
-#     stage:
-#       replicas: 2
-#       api_url: http://my-api.stage.127.0.0.1.nip.io
-#     prod:
-#       replicas: 5
-#       api_url: http://my-api.prod.127.0.0.1.nip.io
+      prod:
+        enabled: false
+        branch: main
+        hostname: sample-app.comind-ops.io
+        replicas: 3
