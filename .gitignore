@@ -293,7 +293,6 @@ coverage/
 # Local scripts
 local-*.sh
 dev-*.sh
-test-*.sh
 
 # ===================
 # CI/CD

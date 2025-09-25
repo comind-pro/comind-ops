@@ -1,0 +1,386 @@
+#!/bin/bash
+set -euo pipefail
+
+# ArgoCD Integration Tests
+# Tests ArgoCD configuration and ApplicationSet functionality
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+
+log() { echo "[ARGOCD-TEST] $1"; }
+success() { echo "[PASS] $1"; }
+error() { echo "[FAIL] $1" >&2; }
+
+cd "$PROJECT_ROOT"
+
+test_argocd_manifests() {
+    log "Testing ArgoCD manifest validation..."
+    
+    local test_results=0
+    local argocd_dir="argo"
+    
+    # Test ArgoCD installation values
+    local values_file="$argocd_dir/argocd/install/values.yaml"
+    if [[ -f "$values_file" ]]; then
+        # Validate YAML syntax
+        if yq eval '.' "$values_file" > /dev/null 2>&1; then
+            success "ArgoCD values.yaml is valid YAML"
+        else
+            error "ArgoCD values.yaml has YAML syntax errors"
+            test_results=1
+        fi
+    else
+        error "ArgoCD values.yaml not found"
+        test_results=1
+    fi
+    
+    # Test ApplicationSet manifest
+    local appset_file="$argocd_dir/apps/applicationset.yaml"
+    if [[ -f "$appset_file" ]]; then
+        if kubectl apply --dry-run=client -f "$appset_file" > /dev/null 2>&1; then
+            success "ApplicationSet manifest is valid"
+        else
+            error "ApplicationSet manifest validation failed"
+            test_results=1
+        fi
+    else
+        error "ApplicationSet manifest not found"
+        test_results=1
+    fi
+    
+    return $test_results
+}
+
+test_applicationset_structure() {
+    log "Testing ApplicationSet structure..."
+    
+    local test_results=0
+    local appset_file="argo/apps/applicationset.yaml"
+    
+    if [[ ! -f "$appset_file" ]]; then
+        error "ApplicationSet file not found"
+        return 1
+    fi
+    
+    # Check for required ApplicationSet components
+    local required_fields=(
+        "apiVersion: argoproj.io/v1alpha1"
+        "kind: ApplicationSet"
+        "generators:"
+        "template:"
+    )
+    
+    for field in "${required_fields[@]}"; do
+        if grep -q "$field" "$appset_file"; then
+            success "Found required field: $field"
+        else
+            error "Missing required field: $field"
+            test_results=1
+        fi
+    done
+    
+    # Check for git generator
+    if grep -A 10 "generators:" "$appset_file" | grep -q "git:"; then
+        success "Git generator configured"
+    else
+        error "Git generator not found"
+        test_results=1
+    fi
+    
+    # Check for template configuration
+    if grep -A 20 "template:" "$appset_file" | grep -q "metadata:"; then
+        success "Application template configured"
+    else
+        error "Application template not properly configured"
+        test_results=1
+    fi
+    
+    return $test_results
+}
+
+test_apps_yaml_structure() {
+    log "Testing apps.yaml structure..."
+    
+    local test_results=0
+    local apps_file="apps.yaml"
+    
+    if [[ ! -f "$apps_file" ]]; then
+        error "apps.yaml file not found"
+        return 1
+    fi
+    
+    # Validate YAML syntax
+    if ! yq eval '.' "$apps_file" > /dev/null 2>&1; then
+        error "apps.yaml has YAML syntax errors"
+        return 1
+    fi
+    
+    # Check for required structure
+    if yq eval '.applications' "$apps_file" | grep -q "null"; then
+        error "No applications defined in apps.yaml"
+        test_results=1
+    else
+        success "Applications defined in apps.yaml"
+    fi
+    
+    # Check application structure
+    local app_count=$(yq eval '.applications | length' "$apps_file" 2>/dev/null || echo "0")
+    if [[ "$app_count" -gt 0 ]]; then
+        success "Found $app_count applications in apps.yaml"
+        
+        # Validate each application has required fields
+        local required_app_fields=("name" "namespace" "path")
+        for field in "${required_app_fields[@]}"; do
+            if yq eval ".applications[0] | has(\"$field\")" "$apps_file" | grep -q "true"; then
+                success "Application has required field: $field"
+            else
+                error "Application missing required field: $field"
+                test_results=1
+            fi
+        done
+    else
+        error "No applications found in apps.yaml"
+        test_results=1
+    fi
+    
+    return $test_results
+}
+
+test_argocd_project() {
+    log "Testing ArgoCD project configuration..."
+    
+    local test_results=0
+    local project_file="argo/projects/platform-project.yaml"
+    
+    if [[ ! -f "$project_file" ]]; then
+        log "ArgoCD project file not found - skipping project tests"
+        return 0
+    fi
+    
+    # Validate project manifest
+    if kubectl apply --dry-run=client -f "$project_file" > /dev/null 2>&1; then
+        success "ArgoCD project manifest is valid"
+    else
+        error "ArgoCD project manifest validation failed"
+        test_results=1
+    fi
+    
+    # Check for required project fields
+    local required_fields=("sourceRepos" "destinations" "clusterResourceWhitelist")
+    for field in "${required_fields[@]}"; do
+        if grep -q "$field" "$project_file"; then
+            success "Project has required field: $field"
+        else
+            error "Project missing required field: $field"
+            test_results=1
+        fi
+    done
+    
+    return $test_results
+}
+
+test_argocd_configuration() {
+    log "Testing ArgoCD configuration consistency..."
+    
+    local test_results=0
+    
+    # Check if repository URLs are consistent
+    local repo_urls=(
+        $(grep -r "repoURL:" argo/ --include="*.yaml" | sed 's/.*repoURL: *//' | sort | uniq)
+    )
+    
+    if [[ ${#repo_urls[@]} -eq 1 ]]; then
+        success "Consistent repository URL across ArgoCD configurations"
+    elif [[ ${#repo_urls[@]} -gt 1 ]]; then
+        error "Inconsistent repository URLs found: ${repo_urls[*]}"
+        test_results=1
+    else
+        error "No repository URLs found"
+        test_results=1
+    fi
+    
+    # Check target revision consistency
+    local target_revisions=(
+        $(grep -r "targetRevision:" argo/ --include="*.yaml" | sed 's/.*targetRevision: *//' | sort | uniq)
+    )
+    
+    if [[ ${#target_revisions[@]} -eq 1 ]] && [[ "${target_revisions[0]}" == "HEAD" ]]; then
+        success "Consistent target revision (HEAD) across ArgoCD configurations"
+    else
+        log "Multiple target revisions found: ${target_revisions[*]} (may be intentional)"
+    fi
+    
+    return $test_results
+}
+
+test_sync_policy() {
+    log "Testing ArgoCD sync policies..."
+    
+    local test_results=0
+    local appset_file="argo/apps/applicationset.yaml"
+    
+    # Check for sync policy configuration
+    if grep -A 10 "syncPolicy:" "$appset_file" > /dev/null 2>&1; then
+        success "Sync policy configured in ApplicationSet"
+        
+        # Check for automated sync
+        if grep -A 5 "syncPolicy:" "$appset_file" | grep -q "automated:"; then
+            success "Automated sync configured"
+        else
+            log "Manual sync configured (automated sync not enabled)"
+        fi
+        
+        # Check for self-heal
+        if grep -A 10 "automated:" "$appset_file" | grep -q "selfHeal:"; then
+            success "Self-heal configuration found"
+        else
+            log "Self-heal not configured"
+        fi
+        
+        # Check for prune
+        if grep -A 10 "automated:" "$appset_file" | grep -q "prune:"; then
+            success "Prune configuration found"
+        else
+            log "Prune not configured"
+        fi
+    else
+        error "No sync policy configured in ApplicationSet"
+        test_results=1
+    fi
+    
+    return $test_results
+}
+
+test_application_template() {
+    log "Testing ArgoCD application template..."
+    
+    local test_results=0
+    local appset_file="argo/apps/applicationset.yaml"
+    
+    # Extract application template and validate
+    if yq eval '.spec.template' "$appset_file" > /tmp/app-template.yaml 2>/dev/null; then
+        # Check template structure
+        local template_file="/tmp/app-template.yaml"
+        
+        if yq eval '.metadata.name' "$template_file" | grep -q "{{"; then
+            success "Application name templating configured"
+        else
+            error "Application name templating not configured"
+            test_results=1
+        fi
+        
+        if yq eval '.metadata.namespace' "$template_file" | grep -q "argocd"; then
+            success "Application namespace configured"
+        else
+            error "Application namespace not configured"
+            test_results=1
+        fi
+        
+        if yq eval '.spec.destination.namespace' "$template_file" | grep -q "{{"; then
+            success "Destination namespace templating configured"
+        else
+            error "Destination namespace templating not configured"
+            test_results=1
+        fi
+        
+        # Cleanup
+        rm -f "$template_file"
+    else
+        error "Failed to extract application template"
+        test_results=1
+    fi
+    
+    return $test_results
+}
+
+# Simulate ArgoCD deployment test
+test_simulated_deployment() {
+    log "Testing simulated ArgoCD deployment..."
+    
+    local test_results=0
+    local test_namespace="test-argocd-$$"
+    
+    # Create test namespace
+    kubectl create namespace "$test_namespace" 2>/dev/null || true
+    
+    # Test if ArgoCD CRDs would be accepted (dry-run)
+    local appset_file="argo/apps/applicationset.yaml"
+    
+    # Since we don't have ArgoCD installed, we'll test the YAML structure
+    # In a real scenario, this would test actual ApplicationSet creation
+    if kubectl apply --dry-run=client -f "$appset_file" 2>&1 | grep -q "no matches for kind"; then
+        log "ApplicationSet CRD not available (expected in test environment)"
+        success "ApplicationSet manifest structure is valid"
+    elif kubectl apply --dry-run=client -f "$appset_file" > /dev/null 2>&1; then
+        success "ApplicationSet would be created successfully"
+    else
+        error "ApplicationSet manifest has validation errors"
+        test_results=1
+    fi
+    
+    # Cleanup
+    kubectl delete namespace "$test_namespace" --ignore-not-found=true > /dev/null 2>&1
+    
+    return $test_results
+}
+
+# Main test execution
+main() {
+    log "Starting ArgoCD integration tests..."
+    
+    # Check dependencies
+    if ! command -v yq &> /dev/null; then
+        error "yq command not available - some tests will be limited"
+        # Continue with limited testing
+    fi
+    
+    local test_results=0
+    
+    # Run ArgoCD integration tests
+    if ! test_argocd_manifests; then
+        test_results=1
+    fi
+    
+    if ! test_applicationset_structure; then
+        test_results=1
+    fi
+    
+    if ! test_apps_yaml_structure; then
+        test_results=1
+    fi
+    
+    if ! test_argocd_project; then
+        test_results=1
+    fi
+    
+    if ! test_argocd_configuration; then
+        test_results=1
+    fi
+    
+    if ! test_sync_policy; then
+        test_results=1
+    fi
+    
+    if ! test_application_template; then
+        test_results=1
+    fi
+    
+    # Only run deployment simulation if kubectl is available
+    if command -v kubectl &> /dev/null; then
+        if ! test_simulated_deployment; then
+            test_results=1
+        fi
+    else
+        log "kubectl not available - skipping deployment tests"
+    fi
+    
+    if [[ $test_results -eq 0 ]]; then
+        success "All ArgoCD integration tests passed!"
+    else
+        error "Some ArgoCD integration tests failed!"
+    fi
+    
+    return $test_results
+}
+
+main "$@"

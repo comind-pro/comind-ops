@@ -272,7 +272,7 @@ spec:
       name: '{{app}}-{{environment}}-infra'
     spec:
       source:
-        repoURL: https://github.com/myorg/infrastructure
+        repoURL: https://github.com/comind-pro/comind-ops
         path: terraform/apps/{{app}}/{{environment}}
 ```
 
