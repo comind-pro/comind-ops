@@ -8,17 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 DOCKER_DIR="$PROJECT_ROOT/infra/docker"
 
-# Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m'
-
-log() { echo -e "${BLUE}[EXTERNAL-SERVICES]${NC} $1"; }
-success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-error() { echo -e "${RED}[ERROR]${NC} $1" >&2; }
-warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+# Load common functions
+source "$SCRIPT_DIR/common.sh"
 
 print_usage() {
     cat << EOF
@@ -87,13 +78,7 @@ ensure_env_file() {
     fi
 }
 
-docker_compose_cmd() {
-    if command -v docker-compose &> /dev/null; then
-        echo "docker-compose"
-    else
-        echo "docker compose"
-    fi
-}
+# docker_compose_cmd() is now provided by common.sh
 
 start_services() {
     log "Starting external services..."
@@ -518,107 +503,3 @@ case "${1:-}" in
         ;;
 esac
 
-# Auto-heal services function
-heal_services() {
-    log "🔧 Auto-healing external services..."
-    local healing_performed=false
-    
-    # Check for PostgreSQL config errors and auto-fix
-    local pg_logs=$(docker compose -f "$DOCKER_COMPOSE_FILE" logs postgres 2>&1)
-    if echo "$pg_logs" | grep -q "unrecognized configuration parameter"; then
-        warning "PostgreSQL configuration error detected - auto-fixing..."
-        
-        # Auto-fix common config issues
-        if echo "$pg_logs" | grep -q "log_collector"; then
-            sed -i.bak '/log_collector/d' "$POSTGRES_CONFIG_FILE" 2>/dev/null || true
-            healing_performed=true
-        fi
-        
-        # Restart if healing was performed
-        if [ "$healing_performed" = true ]; then
-            log "Restarting PostgreSQL with corrected configuration..."
-            docker compose -f "$DOCKER_COMPOSE_FILE" restart postgres
-            wait_for_postgres_healthy
-            success "PostgreSQL auto-healed and restarted successfully."
-        fi
-    fi
-    
-    # Check for container restart loops and fix
-    local pg_restarts=$(docker inspect comind-ops-postgres --format '{{.RestartCount}}' 2>/dev/null || echo "0")
-    if [ "$pg_restarts" -gt 3 ]; then
-        warning "PostgreSQL has restarted $pg_restarts times - investigating..."
-        # Force recreation if stuck in restart loop
-        log "Recreating PostgreSQL container to break restart loop..."
-        docker compose -f "$DOCKER_COMPOSE_FILE" up -d --force-recreate postgres
-        healing_performed=true
-    fi
-    
-    # Auto-fix MinIO permission issues
-    if ! docker exec comind-ops-minio mc ready local 2>/dev/null; then
-        log "MinIO readiness check failed - ensuring bucket permissions..."
-        docker compose -f "$DOCKER_COMPOSE_FILE" restart minio-init 2>/dev/null || true
-        healing_performed=true
-    fi
-    
-    if [ "$healing_performed" = true ]; then
-        success "🔧 External services auto-healing completed successfully."
-        log "Waiting for services to stabilize..."
-        sleep 10
-        status_services
-    else
-        log "✅ External services are healthy - no healing needed."
-    fi
-    
-    return 0
-}
-
-# Auto-heal services function
-heal_services() {
-    log "🔧 Auto-healing external services..."
-    local healing_performed=false
-    
-    # Check for PostgreSQL config errors and auto-fix
-    local pg_logs=$(docker compose -f "$DOCKER_COMPOSE_FILE" logs postgres 2>&1)
-    if echo "$pg_logs" | grep -q "unrecognized configuration parameter"; then
-        warning "PostgreSQL configuration error detected - auto-fixing..."
-        
-        # Auto-fix common config issues
-        if echo "$pg_logs" | grep -q "log_collector"; then
-            sed -i.bak '/log_collector/d' "$POSTGRES_CONFIG_FILE" 2>/dev/null || true
-            healing_performed=true
-        fi
-        
-        # Restart if healing was performed
-        if [ "$healing_performed" = true ]; then
-            log "Restarting PostgreSQL with corrected configuration..."
-            docker compose -f "$DOCKER_COMPOSE_FILE" restart postgres
-            sleep 5
-            success "PostgreSQL auto-healed and restarted successfully."
-        fi
-    fi
-    
-    # Check for container restart loops and fix
-    local pg_restarts=$(docker inspect comind-ops-postgres --format '{{.RestartCount}}' 2>/dev/null || echo "0")
-    if [ "$pg_restarts" -gt 3 ]; then
-        warning "PostgreSQL has restarted $pg_restarts times - recreating container..."
-        docker compose -f "$DOCKER_COMPOSE_FILE" up -d --force-recreate postgres
-        healing_performed=true
-    fi
-    
-    # Auto-fix MinIO permission issues
-    if ! docker exec comind-ops-minio mc ready local 2>/dev/null; then
-        log "MinIO readiness check failed - ensuring bucket permissions..."
-        docker compose -f "$DOCKER_COMPOSE_FILE" restart minio-init 2>/dev/null || true
-        healing_performed=true
-    fi
-    
-    if [ "$healing_performed" = true ]; then
-        success "🔧 External services auto-healing completed successfully."
-        log "Waiting for services to stabilize..."
-        sleep 10
-    else
-        success "✅ External services are healthy - no healing needed."
-    fi
-    
-    return 0
-}

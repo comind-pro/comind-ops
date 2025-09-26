@@ -8,7 +8,7 @@ This directory contains automation scripts for the comind-ops platform that simp
 |--------|---------|-------|
 | `new-app.sh` | Scaffold new applications | `./scripts/new-app.sh <app-name> [options]` |
 | `seal-secret.sh` | Seal secrets for GitOps | `./scripts/seal-secret.sh <app> <env> <secret-file>` |
-| `tf.sh` | Manage Terraform operations | `./scripts/tf.sh <env> [app] [command]` |
+| `tf.sh` | Manage Terraform operations | `./infra/terraform/scripts/tf.sh <env> [app] [command]` |
 
 ## 1. New App Scaffolding (`new-app.sh`)
 
@@ -93,18 +93,18 @@ Manages Terraform operations across different environments and applications with
 ### Usage
 ```bash
 # Core infrastructure
-./scripts/tf.sh dev core plan          # Plan infrastructure changes
-./scripts/tf.sh dev core apply         # Apply infrastructure changes
-./scripts/tf.sh dev core output        # Show terraform outputs
+./infra/terraform/scripts/tf.sh dev core plan          # Plan infrastructure changes
+./infra/terraform/scripts/tf.sh dev core apply         # Apply infrastructure changes
+./infra/terraform/scripts/tf.sh dev core output        # Show terraform outputs
 
 # Application resources
-./scripts/tf.sh dev my-app plan         # Plan app-specific resources
-./scripts/tf.sh dev my-app apply --auto-approve
-./scripts/tf.sh prod my-app destroy     # Destroy production resources
+./infra/terraform/scripts/tf.sh dev my-app plan         # Plan app-specific resources
+./infra/terraform/scripts/tf.sh dev my-app apply --auto-approve
+./infra/terraform/scripts/tf.sh prod my-app destroy     # Destroy production resources
 
 # Advanced operations
-./scripts/tf.sh dev core apply --target aws_instance.example
-./scripts/tf.sh dev core plan --var-file custom.tfvars
+./infra/terraform/scripts/tf.sh dev core apply --target aws_instance.example
+./infra/terraform/scripts/tf.sh dev core plan --var-file custom.tfvars
 ```
 
 ### Supported Directories
@@ -153,10 +153,10 @@ git commit -m "Add sealed secrets for payment-api dev"
 ### 3. Deploy Infrastructure (if needed)
 ```bash
 # Deploy core infrastructure first
-./scripts/tf.sh dev core apply
+./infra/terraform/scripts/tf.sh dev core apply
 
 # Deploy app-specific resources  
-./scripts/tf.sh dev payment-api apply
+./infra/terraform/scripts/tf.sh dev payment-api apply
 ```
 
 ### 4. Push and Deploy
@@ -213,7 +213,7 @@ These scripts are designed to work seamlessly with the ArgoCD ApplicationSet:
 
 3. **Terraform not initialized**
    ```bash
-   ./scripts/tf.sh dev core init
+   ./infra/terraform/scripts/tf.sh dev core init
    ```
 
 4. **Sealed secrets controller not running**
@@ -236,7 +236,7 @@ Each script has comprehensive help:
 ```bash
 ./scripts/new-app.sh --help
 ./scripts/seal-secret.sh --help  
-./scripts/tf.sh --help
+./infra/terraform/scripts/tf.sh --help
 ```
 
 ## Best Practices

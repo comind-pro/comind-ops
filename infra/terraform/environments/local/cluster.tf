@@ -12,17 +12,27 @@ resource "docker_network" "k3d_network" {
   }
 }
 
-# Create k3d cluster using local-exec (temporary until k3d provider is available)
+# Create k3d cluster using local-exec (no official k3d provider available)
 resource "null_resource" "k3d_cluster" {
   count = var.cluster_type == "local" ? 1 : 0
   
   triggers = {
     cluster_name = var.cluster_name
     environment  = var.environment
+    cluster_port = var.cluster_port
+    http_port    = var.ingress_http_port
+    https_port   = var.ingress_https_port
   }
 
   provisioner "local-exec" {
-    command = "${path.module}/../../scripts/create-k3d-cluster.sh ${var.cluster_name} ${var.environment} ${var.cluster_type}"
+    command = templatefile("${path.module}/../scripts/create-k3d-cluster.sh", {
+      cluster_name = var.cluster_name
+      environment  = var.environment
+      cluster_type = var.cluster_type
+      cluster_port = var.cluster_port
+      http_port    = var.ingress_http_port
+      https_port   = var.ingress_https_port
+    })
   }
 
   provisioner "local-exec" {

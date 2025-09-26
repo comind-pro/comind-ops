@@ -118,8 +118,8 @@ make bootstrap
 ### Terraform Operations
 ```bash
 # Core infrastructure
-./scripts/tf.sh dev core plan
-./scripts/tf.sh dev core apply
+./infra/terraform/scripts/tf.sh dev core plan
+./infra/terraform/scripts/tf.sh dev core apply
 
 # Application infrastructure
 make tf-plan-app APP=my-app

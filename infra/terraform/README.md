@@ -34,8 +34,8 @@ make bootstrap PROFILE=local       # Default profile
 make bootstrap                     # Same as above
 
 # Using tf.sh directly
-./scripts/tf.sh dev core plan --profile local
-./scripts/tf.sh dev core apply --profile local
+./infra/terraform/scripts/tf.sh dev core plan --profile local
+./infra/terraform/scripts/tf.sh dev core apply --profile local
 ```
 
 ### AWS Production  
@@ -44,8 +44,8 @@ make bootstrap                     # Same as above
 make bootstrap PROFILE=aws
 
 # Using tf.sh directly  
-./scripts/tf.sh dev core plan --profile aws
-./scripts/tf.sh dev core apply --profile aws
+./infra/terraform/scripts/tf.sh dev core plan --profile aws
+./infra/terraform/scripts/tf.sh dev core apply --profile aws
 ```
 
 ## Environment Details

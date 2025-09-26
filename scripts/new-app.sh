@@ -340,8 +340,8 @@ make tf-init-app APP=${APP_NAME}
 make tf-apply-app APP=${APP_NAME} PROFILE=local
 
 # Or using tf.sh directly
-./scripts/tf.sh dev ${APP_NAME} init --profile local
-./scripts/tf.sh dev ${APP_NAME} apply --profile local
+./infra/terraform/scripts/tf.sh dev ${APP_NAME} init --profile local
+./infra/terraform/scripts/tf.sh dev ${APP_NAME} apply --profile local
 
 # Get application information
 make tf-output APP=${APP_NAME} PROFILE=local
@@ -354,8 +354,8 @@ make tf-init-app APP=${APP_NAME} PROFILE=aws
 make tf-apply-app APP=${APP_NAME} PROFILE=aws
 
 # Or using tf.sh directly
-./scripts/tf.sh dev ${APP_NAME} init --profile aws
-./scripts/tf.sh dev ${APP_NAME} apply --profile aws
+./infra/terraform/scripts/tf.sh dev ${APP_NAME} init --profile aws
+./infra/terraform/scripts/tf.sh dev ${APP_NAME} apply --profile aws
 
 # Get application information
 make tf-output APP=${APP_NAME} PROFILE=aws

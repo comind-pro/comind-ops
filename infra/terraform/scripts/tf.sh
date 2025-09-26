@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # Comind-Ops Platform - Terraform Management Script
-# Usage: ./scripts/tf.sh <environment> [app-name] [command] [options]
+# Usage: ./infra/terraform/scripts/tf.sh <environment> [app-name] [command] [options]
 
 # Check for help first
 if [[ $# -eq 0 ]] || [[ "${1:-}" == "--help" ]] || [[ "${1:-}" == "-h" ]]; then

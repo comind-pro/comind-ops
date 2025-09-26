@@ -68,7 +68,7 @@ bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Servi
 	@echo "$(YELLOW)Step 3/9: Initializing Terraform...$(NC)"
 	@terraform -chdir=infra/terraform/environments/$(PROFILE) init
 	@echo "$(YELLOW)Step 4/9: Deploying core infrastructure...$(NC)"
-	@./scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE)
+	@./infra/terraform/scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE)
 	@echo "$(YELLOW)Step 5/9: Waiting for cluster to be ready...$(NC)"
 	@sleep 30
 	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || echo "ArgoCD still starting..."
@@ -155,7 +155,7 @@ cleanup: ## Destroy cluster and cleanup resources (⚠️  DESTRUCTIVE)
 	@echo "$(YELLOW)Cleaning up comind-ops Platform...$(NC)"
 	@kubectl delete -k k8s/platform/ --ignore-not-found=true
 	@kubectl delete -k k8s/base/ --ignore-not-found=true
-	@./scripts/tf.sh $(ENV) core destroy --auto-approve --profile $(PROFILE)
+	@./infra/terraform/scripts/tf.sh $(ENV) core destroy --auto-approve --profile $(PROFILE)
 	@echo "$(GREEN)✅ Cleanup complete$(NC)"
 
 # ===========================================
@@ -253,7 +253,7 @@ seal: ## Seal secret for GitOps (APP=name ENV=env FILE=secret.yaml)
 .PHONY: tf
 tf: ## Run Terraform command (ENV=env APP=app COMMAND=plan PROFILE=profile)
 	@echo "$(BLUE)🏗️  Running Terraform $(COMMAND) for $(APP) in $(ENV) [$(PROFILE)]$(NC)"
-	@./scripts/tf.sh $(ENV) $(APP) $(COMMAND) --profile $(PROFILE)
+	@./infra/terraform/scripts/tf.sh $(ENV) $(APP) $(COMMAND) --profile $(PROFILE)
 
 .PHONY: tf-plan
 tf-plan: ## Plan Terraform changes (ENV=env APP=app)
@@ -272,32 +272,32 @@ tf-output: ## Show Terraform outputs (ENV=env APP=app)
 tf-init-app: ## Initialize Terraform for application (APP=name PROFILE=local)
 	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP). Run: make new-app-full APP=$(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)🔧 Initializing Terraform for $(APP)...$(NC)"
-	@./scripts/tf.sh $(ENV) $(APP) init --profile $(PROFILE)
+	@./infra/terraform/scripts/tf.sh $(ENV) $(APP) init --profile $(PROFILE)
 
 .PHONY: tf-plan-app  
 tf-plan-app: ## Plan Terraform for application (APP=name PROFILE=local)
 	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)📋 Planning Terraform changes for $(APP)...$(NC)"
-	@./scripts/tf.sh $(ENV) $(APP) plan --profile $(PROFILE)
+	@./infra/terraform/scripts/tf.sh $(ENV) $(APP) plan --profile $(PROFILE)
 
 .PHONY: tf-apply-app
 tf-apply-app: ## Apply Terraform for application (APP=name PROFILE=local)
 	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)🚀 Applying Terraform for $(APP)...$(NC)"
-	@./scripts/tf.sh $(ENV) $(APP) apply --auto-approve --profile $(PROFILE)
+	@./infra/terraform/scripts/tf.sh $(ENV) $(APP) apply --auto-approve --profile $(PROFILE)
 
 .PHONY: tf-destroy-app
 tf-destroy-app: ## Destroy Terraform resources for application (APP=name PROFILE=local)
 	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(YELLOW)⚠️  This will destroy all infrastructure for $(APP). Are you sure? (y/N)$(NC)"
 	@read -r confirm && [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ] || (echo "Cancelled." && exit 1)
-	@./scripts/tf.sh $(ENV) $(APP) destroy --auto-approve --profile $(PROFILE)
+	@./infra/terraform/scripts/tf.sh $(ENV) $(APP) destroy --auto-approve --profile $(PROFILE)
 
 .PHONY: tf-output-app
 tf-output-app: ## Show Terraform outputs for application (APP=name PROFILE=local)
 	@if [ ! -d "k8s/apps/$(APP)/terraform" ]; then echo "$(RED)❌ Terraform config not found for $(APP)$(NC)"; exit 1; fi
 	@echo "$(BLUE)📤 Terraform outputs for $(APP):$(NC)"
-	@./scripts/tf.sh $(ENV) $(APP) output --profile $(PROFILE)
+	@./infra/terraform/scripts/tf.sh $(ENV) $(APP) output --profile $(PROFILE)
 
 .PHONY: tf-status-app
 tf-status-app: ## Show Terraform status for application (APP=name)

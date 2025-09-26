@@ -273,7 +273,7 @@ main() {
     local scripts=(
         "scripts/new-app.sh:new-app.sh"
         "scripts/seal-secret.sh:seal-secret.sh"
-        "scripts/tf.sh:tf.sh"
+        "infra/terraform/scripts/tf.sh:tf.sh"
         "tests/test-ci.sh:test-ci.sh"
         "tests/run-tests.sh:run-tests.sh"
     )

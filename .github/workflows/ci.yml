@@ -50,9 +50,9 @@ jobs:
       - name: "📊 Helm Lint - Applications"
         run: |
           echo "📊 Linting Application Helm Charts..."
-          for app_dir in k8s/apps/*/chart; do
-            if [ -d "$app_dir" ]; then
-              echo "Linting $(basename $(dirname $app_dir))"
+          for app_dir in k8s/charts/apps/*; do
+            if [ -d "$app_dir" ] && [ -f "$app_dir/Chart.yaml" ]; then
+              echo "Linting $(basename $app_dir)"
               helm lint "$app_dir" || exit 1
             fi
           done
@@ -74,9 +74,9 @@ jobs:
     strategy:
       matrix:
         terraform_dir:
-          - infra/terraform/core
+          - infra/terraform/environments/local
+          - infra/terraform/environments/aws
           - infra/terraform/modules/app_skel
-          - infra/terraform/envs/dev/platform
     steps:
       - name: "📥 Checkout Code"
         uses: actions/checkout@v4
@@ -184,14 +184,14 @@ jobs:
         run: |
           echo "🧪 Testing application Helm charts..."
 
-          for app_dir in k8s/apps/*/chart; do
-            if [ -d "$app_dir" ]; then
-              app_name=$(basename $(dirname "$app_dir"))
+          for app_dir in k8s/charts/apps/*; do
+            if [ -d "$app_dir" ] && [ -f "$app_dir/Chart.yaml" ]; then
+              app_name=$(basename "$app_dir")
               echo "Testing $app_name..."
 
               # Test with different values files
               for env in dev stage prod; do
-                values_file="k8s/apps/$app_name/values/$env.yaml"
+                values_file="$app_dir/values/$env.yaml"
                 if [ -f "$values_file" ]; then
                   echo "  Testing $env environment..."
                   helm template "$app_name" "$app_dir" -f "$values_file" --dry-run > /dev/null
@@ -216,6 +216,35 @@ jobs:
           fi
 
           echo "✅ Apps configuration validated"
+
+      - name: "🚀 ArgoCD Application Validation"
+        run: |
+          echo "🚀 Validating ArgoCD Application manifests..."
+
+          # Validate ArgoCD Application manifests
+          if [ -d "k8s/kustomize" ]; then
+            echo "Validating ArgoCD Applications in k8s/kustomize..."
+            find k8s/kustomize -name "*.yaml" -exec yamllint {} \; || echo "⚠️  YAML lint warnings found"
+            
+            # Check for required ArgoCD Application fields
+            for app_file in $(find k8s/kustomize -name "*.yaml"); do
+              if grep -q "kind: Application" "$app_file"; then
+                echo "Validating ArgoCD Application: $app_file"
+                # Check for required fields
+                if ! grep -q "apiVersion: argoproj.io/v1alpha1" "$app_file"; then
+                  echo "❌ Missing apiVersion in $app_file"
+                  exit 1
+                fi
+                if ! grep -q "spec:" "$app_file"; then
+                  echo "❌ Missing spec in $app_file"
+                  exit 1
+                fi
+                echo "✅ $app_file is valid"
+              fi
+            done
+          fi
+
+          echo "✅ ArgoCD Application validation complete"
 
   # ===========================================
   # SECURITY SCANNING

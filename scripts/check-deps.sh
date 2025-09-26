@@ -128,7 +128,7 @@ check_file_permissions() {
     local scripts=(
         "scripts/new-app.sh"
         "scripts/seal-secret.sh"
-        "scripts/tf.sh"
+        "infra/terraform/scripts/tf.sh"
         "scripts/external-services.sh"
     )
     

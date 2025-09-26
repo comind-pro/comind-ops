@@ -32,10 +32,10 @@ output "argocd_credentials" {
   description = "ArgoCD admin credentials"
   value = {
     username = "admin"
-    password = data.external.argocd_password_local[0].result.password
+    password = "Use 'kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d' to get password"
   }
   sensitive  = true
-  depends_on = [null_resource.wait_for_argocd_local]
+  depends_on = [helm_release.argocd]
 }
 
 output "registry_endpoint" {
@@ -45,7 +45,7 @@ output "registry_endpoint" {
 
 output "namespaces_created" {
   description = "List of namespaces created by Terraform"
-  value       = ["platform-dev", "platform-stage", "platform-prod", "argocd", "sealed-secrets", "metallb-system"]
+  value       = ["platform-dev", "argocd", "sealed-secrets", "metallb-system", "ingress-nginx"]
 }
 
 output "external_services_status" {
