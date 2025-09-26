@@ -39,7 +39,7 @@ APP_NAME="${2:-core}"
 COMMAND="${3:-plan}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(dirname "$(dirname "$(dirname "$SCRIPT_DIR")")")"
 
 # Colors for output
 RED='\033[0;31m'
@@ -97,6 +97,7 @@ VAR_FILE=""
 TARGET=""
 WORKSPACE=""
 PROFILE="local"
+TF_VARS=()
 
 # Parse command line arguments
 shift 3 # Remove positional arguments
@@ -108,6 +109,7 @@ while [[ $# -gt 0 ]]; do
         --target) TARGET="$2"; shift 2 ;;
         --workspace) WORKSPACE="$2"; shift 2 ;;
         --profile) PROFILE="$2"; shift 2 ;;
+        -var=*) TF_VARS+=("$1"); shift ;;
         *) error "Unknown option: $1"; print_usage; exit 1 ;;
     esac
 done
@@ -120,9 +122,22 @@ if [[ -z "$ENVIRONMENT" ]]; then
     exit 1
 fi
 
-if [[ ! "$ENVIRONMENT" =~ ^(dev|stage|prod)$ ]]; then
-    error "Environment must be one of: dev, stage, prod"
-    exit 1
+# Allow comma-separated environments for multi-environment deployment
+if [[ "$ENVIRONMENT" =~ , ]]; then
+    # Multiple environments - validate each one
+    IFS=',' read -ra ENVS <<< "$ENVIRONMENT"
+    for env in "${ENVS[@]}"; do
+        if [[ ! "$env" =~ ^(dev|stage|qa|prod)$ ]]; then
+            error "Environment '$env' must be one of: dev, stage, qa, prod"
+            exit 1
+        fi
+    done
+else
+    # Single environment
+    if [[ ! "$ENVIRONMENT" =~ ^(dev|stage|qa|prod)$ ]]; then
+        error "Environment must be one of: dev, stage, qa, prod"
+        exit 1
+    fi
 fi
 
 if [[ ! "$PROFILE" =~ ^(local|aws)$ ]]; then
@@ -171,7 +186,12 @@ fi
 
 # Set workspace
 if [[ -z "$WORKSPACE" ]]; then
-    WORKSPACE="$ENVIRONMENT"
+    # For multi-environment, use a safe workspace name
+    if [[ "$ENVIRONMENT" =~ , ]]; then
+        WORKSPACE="multi-env"
+    else
+        WORKSPACE="$ENVIRONMENT"
+    fi
 fi
 
 # Configure providers based on profile (for app terraform)
@@ -262,6 +282,8 @@ fi
 if [[ "$AUTO_APPROVE" == "true" && ("$COMMAND" == "apply" || "$COMMAND" == "destroy") ]]; then
     TF_ARGS+=("-auto-approve")
 fi
+# Add custom variables
+TF_ARGS+=("${TF_VARS[@]}")
 
 # Select workspace
 if terraform workspace list | grep -q "$WORKSPACE"; then

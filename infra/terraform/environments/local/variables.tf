@@ -85,6 +85,12 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
+variable "metallb_ip_range" {
+  description = "IP range for MetalLB load balancer"
+  type        = string
+  default     = "172.20.0.100-172.20.0.200"
+}
+
 # Repository configuration
 variable "repo_url" {
   description = "Repository URL (supports both private and public)"

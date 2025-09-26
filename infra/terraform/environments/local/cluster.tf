@@ -25,13 +25,13 @@ resource "null_resource" "k3d_cluster" {
   }
 
   provisioner "local-exec" {
-    command = templatefile("${path.module}/../scripts/create-k3d-cluster.sh", {
-      cluster_name = var.cluster_name
-      environment  = var.environment
-      cluster_type = var.cluster_type
-      cluster_port = var.cluster_port
-      http_port    = var.ingress_http_port
-      https_port   = var.ingress_https_port
+    command = templatefile("${path.module}/../../scripts/create-k3d-cluster.sh", {
+      CLUSTER_NAME = var.cluster_name
+      ENVIRONMENT  = var.environment
+      CLUSTER_TYPE = var.cluster_type
+      CLUSTER_PORT = var.cluster_port
+      INGRESS_HTTP_PORT = var.ingress_http_port
+      INGRESS_HTTPS_PORT = var.ingress_https_port
     })
   }
 

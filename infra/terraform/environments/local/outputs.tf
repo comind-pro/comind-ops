@@ -32,10 +32,10 @@ output "argocd_credentials" {
   description = "ArgoCD admin credentials"
   value = {
     username = "admin"
-    password = "Use 'kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d' to get password"
+    password = "Use 'kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath=\"{.data.password}\" | base64 -d' to get password"
   }
   sensitive  = true
-  depends_on = [helm_release.argocd]
+  depends_on = [null_resource.install_argocd]
 }
 
 output "registry_endpoint" {

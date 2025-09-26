@@ -2,10 +2,7 @@
 # EXTERNAL SERVICES VALIDATION
 # ====================================================
 
-# Data source to check external services
-data "external" "external_services_check" {
-  program = ["${path.module}/../../scripts/check-external-services.sh"]
-}
+# External services validation (using data source from data.tf)
 
 # External services status output
 resource "null_resource" "external_services_status" {

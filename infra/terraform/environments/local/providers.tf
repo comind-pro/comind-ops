@@ -46,15 +46,5 @@ provider "aws" {
   secret_key = var.cluster_type == "local" ? "mock" : null
 }
 
-# Configure providers to use k3d cluster
-provider "kubernetes" {
-  config_path    = null
-  config_context = null
-}
-
-provider "helm" {
-  kubernetes {
-    config_path    = null
-    config_context = null
-  }
-}
+# Note: Kubernetes and Helm providers are not used in local environment
+# All Kubernetes resources are managed via kubectl and helm CLI commands

@@ -11,5 +11,5 @@ data "external" "external_services_check" {
 data "external" "argocd_password" {
   count = var.cluster_type == "local" ? 1 : 0
   program = ["${path.module}/../../scripts/get-argocd-password.sh"]
-  depends_on = [helm_release.argocd]
+  depends_on = [null_resource.install_argocd]
 }

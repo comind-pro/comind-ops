@@ -90,7 +90,7 @@ bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Servi
 	@echo "$(YELLOW)Step 5/10: Deploying core infrastructure...$(NC)"
 	@if echo "$(ENV)" | grep -q ","; then \
 		echo "$(BLUE)Deploying multiple environments: $(ENV)$(NC)"; \
-		./infra/terraform/scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE) -var="environments=$(ENV)" -var="multi_environment=true"; \
+		./infra/terraform/scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE) -var="environments=[\"$(shell echo $(ENV) | sed 's/,/","/g')\"]" -var="multi_environment=true"; \
 	else \
 		echo "$(BLUE)Deploying single environment: $(ENV)$(NC)"; \
 		./infra/terraform/scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE) -var="environments=[\"$(ENV)\"]" -var="multi_environment=false"; \
