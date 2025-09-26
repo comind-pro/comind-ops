@@ -33,13 +33,13 @@ provider "docker" {}
 
 provider "aws" {
   region = var.aws_region
-  
+
   # Skip all AWS provider configuration when using local profile
   skip_credentials_validation = var.cluster_type == "local"
-  skip_metadata_api_check    = var.cluster_type == "local"
-  skip_region_validation     = var.cluster_type == "local"
+  skip_metadata_api_check     = var.cluster_type == "local"
+  skip_region_validation      = var.cluster_type == "local"
   skip_requesting_account_id  = var.cluster_type == "local"
-  
+
   # Use mock credentials for local development to avoid AWS calls
   # In production, use environment variables or AWS profiles
   access_key = var.cluster_type == "local" ? "mock" : null

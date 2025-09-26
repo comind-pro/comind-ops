@@ -39,13 +39,19 @@ test_helm_chart_structure() {
     
     log "Testing chart structure for $app_name..."
     
+    # Check if this is a chart with external dependencies
+    local has_dependencies=false
+    if [[ -f "$chart_dir/Chart.yaml" ]] && grep -q "dependencies:" "$chart_dir/Chart.yaml"; then
+        has_dependencies=true
+    fi
+    
     # Check required files
-    local required_files=(
-        "Chart.yaml"
-        "values.yaml"
-        "templates/"
-        "templates/_helpers.tpl"
-    )
+    local required_files=("Chart.yaml" "values.yaml")
+    
+    # Only require templates for charts without external dependencies
+    if [[ "$has_dependencies" == "false" ]]; then
+        required_files+=("templates/" "templates/_helpers.tpl")
+    fi
     
     for file in "${required_files[@]}"; do
         if [[ ! -e "$chart_dir/$file" ]]; then
@@ -65,10 +71,12 @@ test_helm_chart_structure() {
         return 1
     fi
     
-    # Check templates directory
-    if [[ ! -d "$chart_dir/templates" ]] || [[ -z "$(ls -A "$chart_dir/templates")" ]]; then
-        error "Templates directory must exist and contain templates"
-        return 1
+    # Check templates directory (only for charts without dependencies)
+    if [[ "$has_dependencies" == "false" ]]; then
+        if [[ ! -d "$chart_dir/templates" ]] || [[ -z "$(ls -A "$chart_dir/templates")" ]]; then
+            error "Templates directory must exist and contain templates"
+            return 1
+        fi
     fi
     
     success "Chart structure valid for $app_name"
@@ -152,7 +160,20 @@ test_helm_template_output() {
     fi
     
     # Check for required Kubernetes resources
-    local required_resources=("Deployment" "Service")
+    # For charts with external dependencies, only check for Service
+    local required_resources=("Service")
+    
+    # Check if this is a chart with external dependencies
+    local has_dependencies=false
+    if [[ -f "$chart_dir/Chart.yaml" ]] && grep -q "dependencies:" "$chart_dir/Chart.yaml"; then
+        has_dependencies=true
+    fi
+    
+    # For charts without dependencies, also check for Deployment
+    if [[ "$has_dependencies" == "false" ]]; then
+        required_resources=("Deployment" "Service")
+    fi
+    
     for resource in "${required_resources[@]}"; do
         if ! grep -q "kind: $resource" "$temp_output"; then
             error "Missing required resource $resource in $app_name"
@@ -193,14 +214,22 @@ test_helm_values_schema() {
         return 1
     fi
     
-    # Check for required top-level keys
-    local required_keys=("image" "service")
-    for key in "${required_keys[@]}"; do
-        if ! yq eval "has(\"$key\")" "$values_file" | grep -q true; then
-            error "Missing required key '$key' in values.yaml for $app_name"
-            return 1
-        fi
-    done
+    # Check if this is a chart with external dependencies
+    local has_dependencies=false
+    if [[ -f "$chart_dir/Chart.yaml" ]] && grep -q "dependencies:" "$chart_dir/Chart.yaml"; then
+        has_dependencies=true
+    fi
+    
+    # For charts without dependencies, check for required top-level keys
+    if [[ "$has_dependencies" == "false" ]]; then
+        local required_keys=("image" "service")
+        for key in "${required_keys[@]}"; do
+            if ! yq eval "has(\"$key\")" "$values_file" | grep -q true; then
+                error "Missing required key '$key' in values.yaml for $app_name"
+                return 1
+            fi
+        done
+    fi
     
     success "Values schema is valid for $app_name"
     return 0
@@ -217,14 +246,21 @@ main() {
     if [[ -n "$SPECIFIC_APP" ]]; then
         if [[ -d "k8s/apps/$SPECIFIC_APP/chart" ]]; then
             chart_dirs=("k8s/apps/$SPECIFIC_APP/chart")
+        elif [[ -d "k8s/charts/apps/$SPECIFIC_APP" ]]; then
+            chart_dirs=("k8s/charts/apps/$SPECIFIC_APP")
         else
             error "Chart not found for app: $SPECIFIC_APP"
             return 1
         fi
     else
+        # Find charts in both k8s/apps and k8s/charts directories
         while IFS= read -r -d '' chart_dir; do
             chart_dirs+=("$chart_dir")
         done < <(find k8s/apps -name chart -type d -print0 2>/dev/null)
+        
+        while IFS= read -r -d '' chart_dir; do
+            chart_dirs+=("$chart_dir")
+        done < <(find k8s/charts -mindepth 2 -maxdepth 2 -type d -print0 2>/dev/null)
     fi
     
     if [[ ${#chart_dirs[@]} -eq 0 ]]; then
@@ -234,7 +270,12 @@ main() {
     
     # Run tests for each chart
     for chart_dir in "${chart_dirs[@]}"; do
-        local app_name=$(basename "$(dirname "$chart_dir")")
+        local app_name
+        if [[ "$chart_dir" =~ k8s/apps/.*/chart ]]; then
+            app_name=$(basename "$(dirname "$chart_dir")")
+        else
+            app_name=$(basename "$chart_dir")
+        fi
         log "Testing Helm chart: $app_name"
         
         # Structure tests

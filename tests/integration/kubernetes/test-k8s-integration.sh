@@ -115,19 +115,30 @@ test_rbac_resources() {
         test_results=1
     fi
     
-    # Create temporary namespace for testing
-    local test_ns="test-rbac-$$"
-    kubectl create namespace "$test_ns" 2>/dev/null || true
+    # Create required namespaces for RBAC resources
+    kubectl create namespace backup-system --ignore-not-found=true > /dev/null 2>&1
+    kubectl create namespace platform-dev --ignore-not-found=true > /dev/null 2>&1
+    kubectl create namespace platform-stage --ignore-not-found=true > /dev/null 2>&1
+    kubectl create namespace platform-prod --ignore-not-found=true > /dev/null 2>&1
     
-    # Apply RBAC resources to test namespace
-    if kubectl apply -f "$rbac_file" -n "$test_ns" > /dev/null 2>&1; then
+    # Apply RBAC resources
+    if kubectl apply -f "$rbac_file" > /dev/null 2>&1; then
         success "RBAC resources applied successfully"
         
         # Cleanup
-        kubectl delete namespace "$test_ns" --ignore-not-found=true > /dev/null 2>&1
+        kubectl delete -f "$rbac_file" --ignore-not-found=true > /dev/null 2>&1
+        kubectl delete namespace backup-system --ignore-not-found=true > /dev/null 2>&1
+        kubectl delete namespace platform-dev --ignore-not-found=true > /dev/null 2>&1
+        kubectl delete namespace platform-stage --ignore-not-found=true > /dev/null 2>&1
+        kubectl delete namespace platform-prod --ignore-not-found=true > /dev/null 2>&1
     else
         error "RBAC resources application failed"
-        kubectl delete namespace "$test_ns" --ignore-not-found=true > /dev/null 2>&1
+        # Cleanup on failure
+        kubectl delete -f "$rbac_file" --ignore-not-found=true > /dev/null 2>&1
+        kubectl delete namespace backup-system --ignore-not-found=true > /dev/null 2>&1
+        kubectl delete namespace platform-dev --ignore-not-found=true > /dev/null 2>&1
+        kubectl delete namespace platform-stage --ignore-not-found=true > /dev/null 2>&1
+        kubectl delete namespace platform-prod --ignore-not-found=true > /dev/null 2>&1
         test_results=1
     fi
     
@@ -206,7 +217,7 @@ test_helm_chart_deployment() {
     
     for app_name in "${charts_to_test[@]}"; do
         local chart_dir="k8s/apps/$app_name/chart"
-        local values_file="k8s/apps/$app_name/values/dev.yaml"
+        local values_file="k8s/apps/$app_name/chart/values.yaml"
         
         log "Testing deployment of $app_name..."
         

@@ -15,8 +15,8 @@ output "namespace_labels" {
 output "database" {
   description = "Database configuration and connection details"
   value = {
-    enabled = false
-    message = "Using platform-wide PostgreSQL service deployed via ArgoCD"
+    enabled          = false
+    message          = "Using platform-wide PostgreSQL service deployed via ArgoCD"
     platform_service = "postgresql-dev.platform-dev.svc.cluster.local:5432"
   }
   sensitive = false
@@ -26,10 +26,10 @@ output "database" {
 output "storage" {
   description = "Storage configuration and bucket details"
   value = {
-    enabled = false
-    message = "Using platform-wide MinIO service deployed via ArgoCD"
+    enabled          = false
+    message          = "Using platform-wide MinIO service deployed via ArgoCD"
     platform_service = "minio-dev.platform-dev.svc.cluster.local:9000"
-    console_service = "minio-dev-console.platform-dev.svc.cluster.local:9001"
+    console_service  = "minio-dev-console.platform-dev.svc.cluster.local:9001"
   }
   sensitive = false
 }
@@ -54,8 +54,8 @@ output "queue" {
 output "cache" {
   description = "Cache configuration and connection details"
   value = {
-    enabled = false
-    message = "Using platform-wide Redis service deployed via ArgoCD"
+    enabled          = false
+    message          = "Using platform-wide Redis service deployed via ArgoCD"
     platform_service = "redis-dev-master.platform-dev.svc.cluster.local:6379"
   }
   sensitive = false
@@ -151,10 +151,10 @@ output "secrets_secret_name" {
 output "service_endpoints" {
   description = "Service endpoints for connecting to provisioned resources"
   value = {
-    database_url = var.database.enabled ? "postgresql://${module.database[0].username}:${module.database[0].password}@${module.database[0].endpoint}:${module.database[0].port}/${module.database[0].database_name}" : ""
-    storage_url  = var.storage.enabled ? "http://${module.storage[0].endpoint}" : ""
-    queue_url    = var.queue.enabled ? "http://${module.queue[0].endpoint}" : ""
-    cache_url    = var.cache.enabled ? "${module.cache[0].endpoint}:${module.cache[0].port}" : ""
+    database_url = "postgresql://${local.database_username}:postgres@postgresql-dev.platform-dev.svc.cluster.local:5432/${local.database_name}"
+    storage_url  = "http://minio-dev.platform-dev.svc.cluster.local:9000"
+    queue_url    = var.queue.enabled ? module.queue[0].endpoint : ""
+    cache_url    = "redis-dev-master.platform-dev.svc.cluster.local:6379"
     app_url      = var.networking.ingress_enabled ? "http://${module.networking.ingress_hostname}" : ""
   }
   sensitive = true

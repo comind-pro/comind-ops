@@ -154,9 +154,9 @@ variable "environments" {
   description = "List of environments to deploy (comma-separated string or list)"
   type        = any
   default     = ["dev"]
-  
+
   validation {
-    condition = can(tolist(var.environments)) || can(split(",", var.environments))
+    condition     = can(tolist(var.environments)) || can(split(",", var.environments))
     error_message = "Environments must be a list of strings or a comma-separated string."
   }
 }

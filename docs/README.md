@@ -1,176 +1,238 @@
 # Comind-Ops Platform Documentation
 
-Complete documentation for the Comind-Ops Platform covering architecture, operations, and development workflows.
+Welcome to the Comind-Ops Platform documentation. This comprehensive guide covers all aspects of the platform, from architecture and deployment to troubleshooting and API usage.
 
-## 📋 Documentation Index
+## 📚 Documentation Structure
 
-### **🏗️ Infrastructure & Architecture**
-- **[Infrastructure Architecture](infra-architecture.md)**: Complete system architecture and design patterns
-- **[External Services](external-services.md)**: PostgreSQL and MinIO Docker container management
-- **[Onboarding Guide](onboarding.md)**: Step-by-step developer onboarding and setup
+### 🏗️ Architecture
+- **[System Overview](architecture/system-overview.md)** - High-level system architecture and components
+- **[Security Model](architecture/security-model.md)** - Security architecture and best practices
+- **[Data Flow](architecture/data-flow.md)** - Data flow patterns and architectures
 
-### **🔒 Security & Operations**  
-- **[Secrets Management](secrets.md)**: Sealed Secrets workflows and best practices
-- **[CI/CD Pipelines](ci-cd.md)**: Automation workflows and deployment strategies
+### 🔧 Troubleshooting
+- **[Common Issues](troubleshooting/common-issues.md)** - Solutions to common platform issues
+- **[Debugging Guide](troubleshooting/debugging-guide.md)** - Comprehensive debugging techniques and tools
 
-### **📁 Infrastructure Structure**
-```
-infra/
-├── docker/                    # External services (PostgreSQL, MinIO)
-│   ├── docker-compose.yml     # Service orchestration
-│   ├── postgres/              # Database setup and config
-│   └── scripts/               # Backup automation
-└── terraform/                 # Infrastructure as Code
-    ├── core/                  # Cluster infrastructure
-    ├── modules/app_skel/      # Application templates
-    └── envs/                  # Environment configs
-```
+## 🚀 Quick Start
 
-## 🚀 Quick Reference
-
-### **Platform Commands**
+### 1. Platform Setup
 ```bash
-# Complete platform bootstrap
-make bootstrap
+# Check dependencies
+make check-deps
 
-# External services management
-make services-start           # Start PostgreSQL & MinIO
-make services-status          # Check service health
-make services-backup          # Create backups
+# Bootstrap platform
+make bootstrap PROFILE=local ENV=dev,prod
 
-# Platform status and access
-make status                   # Overall platform status
-make argo-login              # Access ArgoCD UI
+# Check status
+make status
 ```
 
-### **Development Workflows**
+### 2. Create Your First Application
 ```bash
 # Create new application
-make new-app-full APP=my-service TEAM=backend
+make new-app APP=hello-world TEAM=platform
 
-# Infrastructure operations
-make tf-plan-app APP=my-service
-make tf-apply-app APP=my-service
+# Deploy application
+make tf-apply-app APP=hello-world
 
-# Secret management
-make seal-secret APP=my-service ENV=dev FILE=secrets.yaml
+# Check deployment
+kubectl get pods -n hello-world-dev
 ```
 
-### **Testing & Validation**
+### 3. Access Platform Services
 ```bash
-# Run comprehensive tests
-make test                     # All test suites
-make test-unit               # Unit tests only
-make test-integration        # Integration tests
-make test-e2e               # End-to-end tests
+# ArgoCD Dashboard
+make argo-login
+
+# Monitoring Dashboard
+make monitoring-access
+
+# MinIO Console
+open http://localhost:9001
 ```
 
-## 🏗️ Architecture at a Glance
+## 🛠️ Platform Features
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    COMIND-OPS PLATFORM                 │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  ┌─────────────────┐  ┌─────────────────┐              │
-│  │   KUBERNETES    │  │ EXTERNAL SERVICES │              │
-│  │     CLUSTER     │  │  (infra/docker)  │              │
-│  │                 │  │                  │              │
-│  │ • ArgoCD        │◀─┤ • PostgreSQL     │              │
-│  │ • Applications  │  │ • MinIO          │              │
-│  │ • Platform Svcs │  │ • Auto Backups   │              │
-│  └─────────────────┘  └─────────────────┘              │
-│                                                         │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │                    AUTOMATION                       │ │
-│  │ Terraform • Helm • Scripts • CI/CD • Testing       │ │
-│  └─────────────────────────────────────────────────────┘ │
-└─────────────────────────────────────────────────────────┘
-```
+### Core Capabilities
+- **GitOps Deployment**: ArgoCD-based continuous deployment
+- **Multi-Environment**: Dev, staging, and production environments
+- **Application Management**: Automated app creation and deployment
+- **Platform Services**: PostgreSQL, Redis, MinIO, ElasticMQ
+- **Monitoring**: Application and platform monitoring
+- **Security**: Pod security, network policies, RBAC
 
-## 🎯 Core Features
+### Infrastructure Management
+- **Terraform**: Infrastructure as Code
+- **Kubernetes**: Container orchestration
+- **Helm**: Package management
+- **Kustomize**: Configuration management
 
-- **🐳 External Data Services**: PostgreSQL and MinIO in `infra/docker/`
-- **☸️ Kubernetes Platform**: Full GitOps with ArgoCD
-- **🏗️ Infrastructure as Code**: Terraform modules and environments
-- **🔒 Enterprise Security**: RBAC, secrets, network policies
-- **🧪 Comprehensive Testing**: Multi-level test automation
-- **📊 Complete Observability**: Monitoring, logging, health checks
+### Development Tools
+- **CI/CD**: GitHub Actions integration
+- **Container Registry**: Docker image management
+- **Testing**: Unit, integration, and E2E tests
+- **Documentation**: Comprehensive documentation
 
-## 🚀 Getting Started
+## 🔍 Finding Information
 
-1. **Prerequisites**: `make check-deps`
-2. **Bootstrap**: `make bootstrap` 
-3. **Verify**: `make status`
-4. **Deploy App**: `make new-app-full APP=hello TEAM=demo`
+### By Task
+- **Getting Started**: See [System Overview](architecture/system-overview.md)
+- **Troubleshooting Issues**: See [Common Issues](troubleshooting/common-issues.md)
+- **Debugging Problems**: See [Debugging Guide](troubleshooting/debugging-guide.md)
 
-## 🔧 Troubleshooting Resources
+### By Component
+- **ArgoCD**: See [System Overview](architecture/system-overview.md#argocd-gitops)
+- **Kubernetes**: See [System Overview](architecture/system-overview.md#kubernetes-cluster)
+- **Terraform**: See [System Overview](architecture/system-overview.md#terraform-infrastructure-as-code)
+- **Monitoring**: See [System Overview](architecture/system-overview.md#monitoring-dashboard)
+- **Security**: See [Security Model](architecture/security-model.md)
 
-### **Common Issues**
-- **Services not starting**: Check `make services-status`
-- **Cluster issues**: Verify with `kubectl cluster-info`
-- **ArgoCD problems**: Check `make argo-status`
+### By Environment
+- **Local Development**: See [System Overview](architecture/system-overview.md#development-environment)
+- **Staging**: See [System Overview](architecture/system-overview.md#staging-environment)
+- **Production**: See [System Overview](architecture/system-overview.md#production-environment)
 
-### **Debug Commands**
+## 📋 Common Workflows
+
+### Application Development Workflow
+1. **Create Application**: `make new-app APP=my-app TEAM=backend`
+2. **Develop Code**: Implement your application
+3. **Build Image**: CI/CD pipeline builds Docker image
+4. **Deploy**: ArgoCD automatically deploys the application
+5. **Monitor**: Use monitoring dashboard to track performance
+
+### Platform Management Workflow
+1. **Bootstrap**: `make bootstrap PROFILE=local ENV=dev,prod`
+2. **Configure**: Set up environment variables and secrets
+3. **Deploy**: Platform services are deployed automatically
+4. **Monitor**: Check platform health and performance
+5. **Maintain**: Regular updates and maintenance
+
+### Troubleshooting Workflow
+1. **Identify Issue**: Use monitoring and logs to identify problems
+2. **Check Status**: `make status` to check platform health
+3. **Review Logs**: Check application and platform logs
+4. **Apply Fix**: Use appropriate solution from troubleshooting guide
+5. **Verify**: Confirm the issue is resolved
+
+## 🔧 Platform Commands
+
+### Bootstrap Commands
 ```bash
-# External services
-make services-logs           # View service logs
-docker ps                   # Check containers
+# Check dependencies
+make check-deps
 
-# Kubernetes debugging  
-kubectl get pods -A         # All pods status
-kubectl logs -n argocd deployment/argocd-server
+# Bootstrap platform
+make bootstrap PROFILE=local ENV=dev,prod
 
-# Platform validation
-make validate               # Validate all configs
-make test-ci               # Test CI/CD components
+# Check status
+make status
 ```
 
-### **Log Locations**
-- **External Services**: `infra/docker/` container logs
-- **Kubernetes**: `kubectl logs` commands
-- **ArgoCD**: Available via UI and `kubectl logs`
-- **Platform**: Service-specific logging
+### Application Commands
+```bash
+# Create new application
+make new-app APP=my-app TEAM=backend
 
-## 📈 Advanced Topics
+# Deploy application infrastructure
+make tf-apply-app APP=my-app
 
-### **Multi-Environment Deployment**
-- Development: Auto-deploy from `main` branch
-- Staging: Tag-triggered deployments
-- Production: Manual approval workflow
+# Check application status
+kubectl get pods -n my-app-dev
+```
 
-### **Security Hardening**
-- Pod Security Standards enforcement
-- Network policy microsegmentation  
-- Sealed Secrets for GitOps-safe secret management
-- RBAC with least-privilege principles
+### Platform Access Commands
+```bash
+# ArgoCD dashboard
+make argo-login
 
-### **Performance Optimization**
-- External services for data persistence
-- Resource quotas and limits
-- Horizontal Pod Autoscaling
-- Cluster autoscaling integration
+# Monitoring dashboard
+make monitoring-access
 
-## 💡 Best Practices
+# MinIO console
+open http://localhost:9001
+```
 
-### **Development**
-- Use `make new-app-*` for consistent app structure
-- Test locally with `make test-*` commands
-- Validate configs with `make validate`
+### GitOps Commands
+```bash
+# Check GitOps status
+make gitops-status
 
-### **Operations**
-- Monitor with `make status`
-- Regular backups with `make services-backup`
-- Use GitOps for all deployments
+# Check external services
+make services-status
+```
 
-### **Security**
-- Rotate secrets regularly
-- Review RBAC permissions
-- Monitor security scan results
-- Keep dependencies updated
+## 🎯 Best Practices
+
+### Development
+- **Use GitOps**: All changes should go through Git
+- **Test Locally**: Test applications locally before deployment
+- **Monitor Performance**: Use monitoring dashboard to track performance
+- **Follow Security**: Implement security best practices
+
+### Operations
+- **Regular Updates**: Keep platform components updated
+- **Monitor Health**: Regularly check platform health
+- **Backup Data**: Regular backups of important data
+- **Document Changes**: Document all platform changes
+
+### Security
+- **Least Privilege**: Use minimal required permissions
+- **Regular Audits**: Regular security audits and reviews
+- **Update Secrets**: Regular secret rotation
+- **Monitor Access**: Monitor user and service access
+
+## 🆘 Getting Help
+
+### Documentation
+- **Architecture**: [System Overview](architecture/system-overview.md)
+- **Troubleshooting**: [Common Issues](troubleshooting/common-issues.md)
+
+## 📊 Platform Status
+
+### Current Version
+- **Platform Version**: 1.0.0
+- **Kubernetes Version**: v1.26.0
+- **ArgoCD Version**: v2.8.0
+- **Helm Version**: v3.12.0
+- **Terraform Version**: v1.5.0
+
+### Supported Environments
+- **Local Development**: k3d cluster
+- **Staging**: Production-like setup
+- **Production**: High-availability setup
+
+### Supported Features
+- ✅ **Multi-Environment**: Dev, staging, production
+- ✅ **GitOps**: ArgoCD-based deployment
+- ✅ **Application Management**: Automated app creation
+- ✅ **Platform Services**: Database, cache, storage, queue
+- ✅ **Monitoring**: Application and platform monitoring
+- ✅ **Security**: Pod security, network policies, RBAC
+- ✅ **CI/CD**: GitHub Actions integration
+- ✅ **Testing**: Comprehensive test suite
+
+## 📝 Contributing
+
+### Code Contributions
+1. **Fork Repository**: Fork the platform repository
+2. **Create Branch**: Create a feature branch
+3. **Implement Changes**: Implement your changes
+4. **Add Tests**: Add appropriate tests
+5. **Submit PR**: Submit a pull request
+
+## 📄 License
+
+This documentation is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## 🙏 Acknowledgments
+
+- **Kubernetes Community**: For the excellent container orchestration platform
+- **ArgoCD Team**: For the powerful GitOps tool
+- **Helm Team**: For the Kubernetes package manager
+- **Terraform Team**: For the infrastructure as code tool
+- **Open Source Community**: For the amazing tools and libraries
 
 ---
 
-This documentation provides everything you need to understand, operate, and extend the Comind-Ops Platform. Start with the [Onboarding Guide](onboarding.md) and explore from there based on your role and needs.
-
-**Questions?** Check the troubleshooting sections or use the debug commands provided above.
+*For the most up-to-date information, please refer to the [GitHub repository](https://github.com/comind-pro/comind-ops).*

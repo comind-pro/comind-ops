@@ -14,18 +14,18 @@ locals {
 # Create namespaces using kubectl
 resource "null_resource" "create_namespaces" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   depends_on = [null_resource.kubeconfig_local]
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       echo "Creating Kubernetes namespaces..."
       
       # Create platform namespaces
-      %{ for env in local.environments_list ~}
+      %{for env in local.environments_list~}
       kubectl create namespace ${var.namespace_prefix}-${env} --dry-run=client -o yaml | kubectl apply -f -
       kubectl label namespace ${var.namespace_prefix}-${env} app.kubernetes.io/name=platform app.kubernetes.io/part-of=comind-ops-platform environment=${env} --overwrite
-      %{ endfor ~}
+      %{endfor~}
       
       # Create MetalLB namespace
       kubectl create namespace metallb-system --dry-run=client -o yaml | kubectl apply -f -
@@ -46,9 +46,9 @@ resource "null_resource" "create_namespaces" {
       echo "Kubernetes namespaces created successfully"
     EOT
   }
-  
+
   triggers = {
-    environments = join(",", local.environments_list)
+    environments     = join(",", local.environments_list)
     namespace_prefix = var.namespace_prefix
   }
 }
@@ -66,9 +66,9 @@ resource "null_resource" "create_namespaces" {
 # Install MetalLB using Helm CLI
 resource "null_resource" "install_metallb" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   depends_on = [null_resource.create_namespaces]
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       echo "Installing MetalLB..."
@@ -86,7 +86,7 @@ resource "null_resource" "install_metallb" {
       echo "MetalLB installed successfully"
     EOT
   }
-  
+
   triggers = {
     namespaces_created = null_resource.create_namespaces[0].id
   }
@@ -95,9 +95,9 @@ resource "null_resource" "install_metallb" {
 # Configure MetalLB IP pool
 resource "null_resource" "metallb_ip_pool" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   depends_on = [null_resource.kubeconfig_local, null_resource.install_metallb]
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       echo "Creating MetalLB IP pool..."
@@ -114,18 +114,18 @@ EOF
       echo "MetalLB IP pool created successfully"
     EOT
   }
-  
+
   triggers = {
     metallb_installed = null_resource.install_metallb[0].id
-    ip_range = var.metallb_ip_range
+    ip_range          = var.metallb_ip_range
   }
 }
 
 resource "null_resource" "metallb_l2_advertisement" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   depends_on = [null_resource.metallb_ip_pool]
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       echo "Creating MetalLB L2 Advertisement..."
@@ -142,7 +142,7 @@ EOF
       echo "MetalLB L2 Advertisement created successfully"
     EOT
   }
-  
+
   triggers = {
     metallb_ip_pool = null_resource.metallb_ip_pool[0].id
   }
@@ -155,9 +155,9 @@ EOF
 # Install Ingress Nginx using Helm CLI
 resource "null_resource" "install_ingress_nginx" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   depends_on = [null_resource.create_namespaces, null_resource.metallb_l2_advertisement]
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       echo "Installing Ingress Nginx..."
@@ -183,7 +183,7 @@ resource "null_resource" "install_ingress_nginx" {
       echo "Ingress Nginx installed successfully"
     EOT
   }
-  
+
   triggers = {
     metallb_configured = null_resource.metallb_l2_advertisement[0].id
   }
@@ -192,9 +192,9 @@ resource "null_resource" "install_ingress_nginx" {
 # Disable Ingress Nginx admission webhook to avoid certificate issues in k3d
 resource "null_resource" "disable_ingress_nginx_webhook" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   depends_on = [null_resource.install_ingress_nginx]
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       echo "Disabling Ingress Nginx admission webhook for k3d compatibility..."
@@ -202,7 +202,7 @@ resource "null_resource" "disable_ingress_nginx_webhook" {
       echo "Ingress Nginx admission webhook disabled"
     EOT
   }
-  
+
   triggers = {
     ingress_nginx_installed = null_resource.install_ingress_nginx[0].id
   }
@@ -221,9 +221,9 @@ resource "null_resource" "disable_ingress_nginx_webhook" {
 # Install Sealed Secrets using Helm CLI
 resource "null_resource" "install_sealed_secrets" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   depends_on = [null_resource.create_namespaces]
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       echo "Installing Sealed Secrets..."
@@ -243,7 +243,7 @@ resource "null_resource" "install_sealed_secrets" {
       echo "Sealed Secrets installed successfully"
     EOT
   }
-  
+
   triggers = {
     namespaces_created = null_resource.create_namespaces[0].id
   }
@@ -256,9 +256,9 @@ resource "null_resource" "install_sealed_secrets" {
 # Install ArgoCD using Helm CLI
 resource "null_resource" "install_argocd" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   depends_on = [null_resource.create_namespaces]
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       echo "Installing ArgoCD..."
@@ -269,57 +269,57 @@ resource "null_resource" "install_argocd" {
       echo "ArgoCD installed successfully"
     EOT
   }
-  
+
   triggers = {
     namespaces_created = null_resource.create_namespaces[0].id
-    environment = var.environment
-    domain_suffix = var.domain_suffix
-    script_version = "2.1"
+    environment        = var.environment
+    domain_suffix      = var.domain_suffix
+    script_version     = "2.1"
   }
 }
 
 # ArgoCD Repository Secret for Private GitHub Access (conditional)
 resource "kubernetes_secret" "argocd_repo_credentials" {
   count = var.cluster_type == "local" && var.repo_type == "private" ? 1 : 0
-  
+
   metadata {
     name      = "argocd-repo-credentials"
     namespace = "argocd"
     labels = {
-      "app.kubernetes.io/name" = "argocd"
+      "app.kubernetes.io/name"      = "argocd"
       "app.kubernetes.io/component" = "repository"
-      "app.kubernetes.io/part-of" = "comind-ops-platform"
+      "app.kubernetes.io/part-of"   = "comind-ops-platform"
     }
   }
-  
+
   type = "Opaque"
-  
+
   data = {
     type     = base64encode("git")
     url      = base64encode(var.repo_url)
     username = base64encode(var.github_username)
     password = base64encode(var.github_token)
   }
-  
+
   depends_on = [null_resource.create_namespaces]
 }
 
 # ArgoCD Repository Server SSH Keys Secret (conditional)
 resource "kubernetes_secret" "argocd_repo_server_ssh_keys" {
   count = var.cluster_type == "local" && var.repo_type == "private" ? 1 : 0
-  
+
   metadata {
     name      = "argocd-repo-server-ssh-keys"
     namespace = "argocd"
     labels = {
-      "app.kubernetes.io/name" = "argocd"
+      "app.kubernetes.io/name"      = "argocd"
       "app.kubernetes.io/component" = "repository-server"
-      "app.kubernetes.io/part-of" = "comind-ops-platform"
+      "app.kubernetes.io/part-of"   = "comind-ops-platform"
     }
   }
-  
+
   type = "Opaque"
-  
+
   data = {
     ssh_known_hosts = base64encode(<<-EOT
       github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
@@ -328,16 +328,16 @@ resource "kubernetes_secret" "argocd_repo_server_ssh_keys" {
     )
     id_ed25519 = base64encode(var.github_ssh_private_key)
   }
-  
+
   depends_on = [null_resource.create_namespaces]
 }
 
 # ArgoCD Project Configuration
 resource "null_resource" "argocd_project" {
   count = var.cluster_type == "local" ? 1 : 0
-  
+
   depends_on = [null_resource.kubeconfig_local, null_resource.install_argocd]
-  
+
   provisioner "local-exec" {
     command = <<-EOT
       echo "Creating ArgoCD project..."
@@ -414,10 +414,10 @@ EOF
       echo "ArgoCD project created successfully"
     EOT
   }
-  
+
   triggers = {
     argocd_installed = null_resource.install_argocd[0].id
-    environment = var.environment
+    environment      = var.environment
   }
 }
 

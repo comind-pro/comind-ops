@@ -59,6 +59,31 @@ tolerations: []
 
 affinity: {}
 
+# Monitoring configuration
+monitoring:
+  serviceMonitor:
+    enabled: false
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false
+
+# Platform Services
+platformServices:
+  database:
+    enabled: false
+  storage:
+    enabled: false
+  cache:
+    enabled: false
+  queue:
+    enabled: false
+
 # Environment variables
 env:
   NODE_ENV: development

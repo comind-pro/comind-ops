@@ -77,6 +77,12 @@ FORCE=false
 VERIFY=false
 NAMESPACE=""
 
+# Check for help flag first
+if [[ "${1:-}" == "--help" ]]; then
+    print_usage
+    exit 0
+fi
+
 # Parse command line arguments
 while [[ $# -gt 3 ]]; do
     case $4 in
@@ -110,9 +116,15 @@ done
 
 # Validation
 if [[ -z "$APP_NAME" || -z "$ENVIRONMENT" || -z "$SECRET_FILE" ]]; then
-    error "All three arguments are required: app-name, environment, secret-file"
-    print_usage
-    exit 1
+    if [[ $# -eq 0 ]]; then
+        # Show usage when no arguments provided
+        print_usage
+        exit 1
+    else
+        error "All three arguments are required: app-name, environment, secret-file"
+        print_usage
+        exit 1
+    fi
 fi
 
 if [[ ! "$APP_NAME" =~ ^[a-z0-9-]+$ ]]; then
