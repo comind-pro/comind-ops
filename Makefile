@@ -43,7 +43,7 @@ help: ## Show this help message
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(YELLOW)%-25s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 	@echo ""
 	@echo "$(GREEN)🔧 Variables:$(NC)"
-	@echo "  ENV        Environment (dev, stage, prod) [default: $(ENV)]"
+	@echo "  ENV        Environment(s) (dev, stage, qa, prod or comma-separated: dev,stage) [default: $(ENV)]"
 	@echo "  APP        Application name [default: $(APP)]"
 	@echo "  COMMAND    Terraform command [default: $(COMMAND)]"
 	@echo "  TEAM       Team name [default: $(TEAM)]"
@@ -52,6 +52,9 @@ help: ## Show this help message
 	@echo "$(GREEN)💡 Examples:$(NC)"
 	@echo "  make bootstrap PROFILE=local      # Local development setup"
 	@echo "  make bootstrap PROFILE=aws        # AWS production setup"
+	@echo "  make bootstrap ENV=dev,stage      # Deploy dev and stage environments"
+	@echo "  make bootstrap ENV=dev,stage,qa,prod # Deploy all environments"
+	@echo "  make bootstrap ENV=prod           # Deploy only production environment"
 	@echo "  make services-setup               # Start external services"
 	@echo "  make new-app-full APP=payment-api TEAM=backend"
 	@echo "  make gitops-status                # Check ArgoCD status"
@@ -85,7 +88,13 @@ bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Servi
 	@echo "$(YELLOW)Step 4/10: Initializing Terraform...$(NC)"
 	@terraform -chdir=infra/terraform/environments/$(PROFILE) init
 	@echo "$(YELLOW)Step 5/10: Deploying core infrastructure...$(NC)"
-	@./infra/terraform/scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE)
+	@if echo "$(ENV)" | grep -q ","; then \
+		echo "$(BLUE)Deploying multiple environments: $(ENV)$(NC)"; \
+		./infra/terraform/scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE) -var="environments=$(ENV)" -var="multi_environment=true"; \
+	else \
+		echo "$(BLUE)Deploying single environment: $(ENV)$(NC)"; \
+		./infra/terraform/scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE) -var="environments=[\"$(ENV)\"]" -var="multi_environment=false"; \
+	fi
 	@echo "$(YELLOW)Step 6/10: Waiting for cluster to be ready...$(NC)"
 	@sleep 30
 	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || echo "ArgoCD still starting..."
@@ -93,12 +102,20 @@ bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Servi
 	@kubectl apply -k k8s/base/
 	@echo "$(YELLOW)Step 8/10: Deploying platform services...$(NC)"
 	@kubectl apply -k k8s/platform/
-	@echo "$(YELLOW)Step 8.1/10: Deploying Redis service...$(NC)"
-	@helm upgrade --install redis-dev k8s/charts/platform/redis -n platform-dev --create-namespace -f k8s/charts/platform/redis/values/dev.yaml
-	@echo "$(YELLOW)Step 8.2/10: Deploying PostgreSQL service...$(NC)"
-	@helm upgrade --install postgresql-dev k8s/charts/platform/postgresql -n platform-dev --create-namespace -f k8s/charts/platform/postgresql/values/dev.yaml
-	@echo "$(YELLOW)Step 8.3/10: Deploying MinIO service...$(NC)"
-	@helm upgrade --install minio-dev k8s/charts/platform/minio -n platform-dev --create-namespace -f k8s/charts/platform/minio/values/dev.yaml
+	@if echo "$(ENV)" | grep -q ","; then \
+		echo "$(BLUE)Deploying services for environments: $(ENV)$(NC)"; \
+		for env in $(subst ,, ,$(ENV)); do \
+			echo "$(YELLOW)Deploying services for $$env environment...$(NC)"; \
+			helm upgrade --install redis-$$env k8s/charts/platform/redis -n platform-$$env --create-namespace -f k8s/charts/platform/redis/values/$$env.yaml; \
+			helm upgrade --install postgresql-$$env k8s/charts/platform/postgresql -n platform-$$env --create-namespace -f k8s/charts/platform/postgresql/values/$$env.yaml; \
+			helm upgrade --install minio-$$env k8s/charts/platform/minio -n platform-$$env --create-namespace -f k8s/charts/platform/minio/values/$$env.yaml; \
+		done; \
+	else \
+		echo "$(BLUE)Deploying services for $(ENV) environment...$(NC)"; \
+		helm upgrade --install redis-$(ENV) k8s/charts/platform/redis -n platform-$(ENV) --create-namespace -f k8s/charts/platform/redis/values/$(ENV).yaml; \
+		helm upgrade --install postgresql-$(ENV) k8s/charts/platform/postgresql -n platform-$(ENV) --create-namespace -f k8s/charts/platform/postgresql/values/$(ENV).yaml; \
+		helm upgrade --install minio-$(ENV) k8s/charts/platform/minio -n platform-$(ENV) --create-namespace -f k8s/charts/platform/minio/values/$(ENV).yaml; \
+	fi
 	@echo "$(YELLOW)Phase 3: ArgoCD GitOps Setup$(NC)"
 	@echo "$(YELLOW)Step 9/10: Setting up GitOps with ArgoCD...$(NC)"
 	@kubectl apply -f k8s/kustomize/root-app.yaml

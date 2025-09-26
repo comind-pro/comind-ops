@@ -1,0 +1,54 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-dashboard-stage
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: monitoring-dashboard
+    app.kubernetes.io/instance: stage
+    app.kubernetes.io/part-of: comind-ops-platform
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: comind-ops-platform
+  source:
+    repoURL: https://github.com/comind-pro/comind-ops
+    targetRevision: main
+    path: k8s/charts/apps/monitoring-dashboard
+    helm:
+      valueFiles:
+        - values/stage.yaml
+      parameters:
+        - name: image.tag
+          value: "stage"
+        - name: namespace
+          value: "platform-stage"
+        - name: domain
+          value: "stage.127.0.0.1.nip.io"
+        - name: replicas
+          value: "2"
+        - name: resources.limits.cpu
+          value: "1000m"
+        - name: resources.limits.memory
+          value: "1Gi"
+        - name: resources.requests.cpu
+          value: "200m"
+        - name: resources.requests.memory
+          value: "256Mi"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: platform-stage
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10

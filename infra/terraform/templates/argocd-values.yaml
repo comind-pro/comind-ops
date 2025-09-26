@@ -4,6 +4,11 @@
 global:
   domain: ${domain}
 
+# Multi-environment configuration
+multiEnvironment: ${multi_environment}
+environments: ${environments}
+namespacePrefix: ${namespace_prefix}
+
 configs:
   params:
     server.insecure: false

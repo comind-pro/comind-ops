@@ -1,4 +1,13 @@
 # ====================================================
+# LOCALS
+# ====================================================
+
+locals {
+  # Parse environments from comma-separated string or list
+  environments_list = can(tolist(var.environments)) ? tolist(var.environments) : split(",", var.environments)
+}
+
+# ====================================================
 # KUBERNETES NAMESPACES
 # ====================================================
 
@@ -20,7 +29,7 @@ resource "kubernetes_namespace" "platform_dev" {
 
 # Create namespaces for multiple environments if enabled
 resource "kubernetes_namespace" "platform_multi" {
-  for_each = var.cluster_type == "local" && var.multi_environment ? toset(var.environments) : toset([])
+  for_each = var.cluster_type == "local" && var.multi_environment ? toset(local.environments_list) : toset([])
   
   metadata {
     name = "${var.namespace_prefix}-${each.key}"
@@ -241,7 +250,7 @@ resource "helm_release" "argocd" {
       repo_url    = var.repo_url
       repo_name   = "comind-ops"
       multi_environment = var.multi_environment
-      environments = jsonencode(var.environments)
+      environments = jsonencode(local.environments_list)
       namespace_prefix = var.namespace_prefix
       repo_server_volumes = var.repo_type == "private" ? jsonencode([
         {
@@ -347,7 +356,7 @@ resource "kubernetes_manifest" "argocd_project" {
           server    = "https://kubernetes.default.svc"
         }
       ], [
-        for env in var.environments : {
+        for env in local.environments_list : {
           namespace = "${var.namespace_prefix}-${env}"
           server    = "https://kubernetes.default.svc"
         }

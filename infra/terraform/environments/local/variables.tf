@@ -145,9 +145,14 @@ variable "domain_suffix" {
 
 # Environment-specific configurations
 variable "environments" {
-  description = "List of environments to deploy"
-  type        = list(string)
-  default     = ["dev", "stage", "qa", "prod"]
+  description = "List of environments to deploy (comma-separated string or list)"
+  type        = any
+  default     = ["dev"]
+  
+  validation {
+    condition = can(tolist(var.environments)) || can(split(",", var.environments))
+    error_message = "Environments must be a list of strings or a comma-separated string."
+  }
 }
 
 variable "environment_configs" {

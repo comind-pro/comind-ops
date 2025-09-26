@@ -21,19 +21,29 @@ Complete cloud-native platform built on Kubernetes, featuring automated GitOps w
 git clone https://github.com/comind-pro/comind-ops.git
 cd comind-ops
 
-# 2. Bootstrap the platform (one command setup!)
-make bootstrap PROFILE=local
+# 2. Setup environment configuration
+make setup-env
+# Edit .env file with your settings
+make validate-env
 
-# 3. Access services
+# 3. Bootstrap the platform
+# Single environment (dev, stage, qa, or prod)
+make bootstrap PROFILE=local ENV=dev
+
+# Multiple environments (comma-separated)
+make bootstrap PROFILE=local ENV=dev,stage
+make bootstrap PROFILE=local ENV=dev,stage,qa,prod
+
+# 4. Access services
 make argo-login                    # ArgoCD dashboard
 make services-status               # Check external services
 make monitoring-access             # Monitoring dashboard
 open http://localhost:9001         # MinIO console
 
-# 4. Create your first application with infrastructure
+# 5. Create your first application with infrastructure
 make new-app-full APP=my-api TEAM=backend
 
-# 5. Check GitOps status
+# 6. Check GitOps status
 make gitops-status
 ```
 
