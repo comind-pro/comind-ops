@@ -1,0 +1,54 @@
+# ArgoCD Helm Chart Values Template
+# This template is used for both local and AWS environments
+
+global:
+  domain: ${domain}
+
+configs:
+  params:
+    server.insecure: false
+  cm:
+    url: https://${domain}
+    application.instanceLabelKey: argocd.argoproj.io/instance
+    # repositories: |
+    #   - url: https://github.com/comind-pro/comind-ops
+    #     name: comind-ops
+    #     type: git
+    #     insecure: true
+
+server:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+      nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+      nginx.ingress.kubernetes.io/ssl-passthrough: "true"
+    hosts:
+      - ${domain}
+    paths:
+      - /
+    pathType: Prefix
+    tls:
+      - hosts:
+          - ${domain}
+        secretName: argocd-ingress-tls
+  service:
+    type: ClusterIP
+  extraArgs:
+    - --insecure
+
+repoServer:
+  service:
+    type: ClusterIP
+
+controller:
+  service:
+    type: ClusterIP
+
+dex:
+  enabled: false
+
+redis:
+  enabled: true

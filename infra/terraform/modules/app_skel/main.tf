@@ -118,39 +118,8 @@ resource "kubernetes_namespace" "app" {
 }
 
 # Include sub-modules based on cluster type and configuration
-# Database module disabled - using platform-wide PostgreSQL service
-# module "database" {
-#   source = "./modules/database"
-#   count  = var.database.enabled ? 1 : 0
-#
-#   app_name             = var.app_name
-#   environment          = var.environment
-#   cluster_type         = var.cluster_type
-#   kubernetes_namespace = kubernetes_namespace.app.metadata[0].name
-#
-#   database_config   = var.database
-#   database_name     = var.database.username != null ? var.database.database_name : local.database_name
-#   database_username = var.database.username != null ? var.database.username : local.database_username
-#   database_password = var.database.password != null ? var.database.password : random_password.database_password[0].result
-#
-#   tags = local.common_tags
-# }
-
-# Storage module disabled - using platform-wide MinIO service
-# module "storage" {
-#   source = "./modules/storage"
-#   count  = var.storage.enabled ? 1 : 0
-#
-#   app_name             = var.app_name
-#   environment          = var.environment
-#   cluster_type         = var.cluster_type
-#   kubernetes_namespace = kubernetes_namespace.app.metadata[0].name
-#
-#   storage_config  = var.storage
-#   storage_buckets = local.storage_buckets
-#
-#   tags = local.common_tags
-# }
+# Database, Storage, and Cache modules removed - using platform-wide services
+# These services are now managed centrally via ArgoCD GitOps
 
 module "queue" {
   source = "./modules/queue"
@@ -167,20 +136,7 @@ module "queue" {
   tags = local.common_tags
 }
 
-# Cache module disabled - using platform-wide Redis service
-# module "cache" {
-#   source = "./modules/cache"
-#   count  = var.cache.enabled ? 1 : 0
-#
-#   app_name             = var.app_name
-#   environment          = var.environment
-#   cluster_type         = var.cluster_type
-#   kubernetes_namespace = kubernetes_namespace.app.metadata[0].name
-#
-#   cache_config = var.cache
-#
-#   tags = local.common_tags
-# }
+# Cache module removed - using platform-wide Redis service
 
 module "networking" {
   source = "./modules/networking"
@@ -233,9 +189,9 @@ module "backup" {
 
   backup_config = var.backup
 
-  # Pass resources that need backup
-  database_id     = var.database.enabled ? module.database[0].database_id : ""
-  storage_buckets = var.storage.enabled ? module.storage[0].bucket_names : []
+  # Pass resources that need backup - using platform-wide services
+  database_id     = "" # Platform-wide PostgreSQL service
+  storage_buckets = [] # Platform-wide MinIO service
 
   tags = local.common_tags
 }
@@ -253,27 +209,27 @@ resource "kubernetes_secret" "app_config" {
   }
 
   data = {
-    # Database configuration
-    "database.enabled"  = var.database.enabled ? "true" : "false"
-    "database.host"     = var.database.enabled ? module.database[0].endpoint : ""
-    "database.port"     = var.database.enabled ? tostring(module.database[0].port) : ""
-    "database.name"     = var.database.enabled ? local.database_name : ""
-    "database.username" = var.database.enabled ? local.database_username : ""
+    # Database configuration - using platform-wide PostgreSQL service
+    "database.enabled"  = "true"
+    "database.host"     = "postgresql-dev.platform-dev.svc.cluster.local"
+    "database.port"     = "5432"
+    "database.name"     = local.database_name
+    "database.username" = local.database_username
 
-    # Storage configuration
-    "storage.enabled"  = var.storage.enabled ? "true" : "false"
-    "storage.endpoint" = var.storage.enabled ? module.storage[0].endpoint : ""
-    "storage.buckets"  = var.storage.enabled ? join(",", [for b in local.storage_buckets : b.name]) : ""
+    # Storage configuration - using platform-wide MinIO service
+    "storage.enabled"  = "true"
+    "storage.endpoint" = "minio-dev.platform-dev.svc.cluster.local:9000"
+    "storage.buckets"  = join(",", [for b in local.storage_buckets : b.name])
 
     # Queue configuration
     "queue.enabled"  = var.queue.enabled ? "true" : "false"
     "queue.endpoint" = var.queue.enabled ? module.queue[0].endpoint : ""
     "queue.queues"   = var.queue.enabled ? join(",", [for q in local.queue_names : q.name]) : ""
 
-    # Cache configuration
-    "cache.enabled"  = var.cache.enabled ? "true" : "false"
-    "cache.endpoint" = var.cache.enabled ? module.cache[0].endpoint : ""
-    "cache.port"     = var.cache.enabled ? tostring(var.cache.port) : ""
+    # Cache configuration - using platform-wide Redis service
+    "cache.enabled"  = "true"
+    "cache.endpoint" = "redis-dev-master.platform-dev.svc.cluster.local"
+    "cache.port"     = "6379"
 
     # Application metadata
     "app.name"        = var.app_name
@@ -300,16 +256,16 @@ resource "kubernetes_secret" "app_secrets" {
   }
 
   data = {
-    # Database secrets
-    "DATABASE_PASSWORD" = var.database.enabled ? base64encode(random_password.database_password[0].result) : ""
-    "DATABASE_URL"      = var.database.enabled ? base64encode("postgresql://${local.database_username}:${random_password.database_password[0].result}@${module.database[0].endpoint}:${module.database[0].port}/${local.database_name}") : ""
+    # Database secrets - using platform-wide PostgreSQL service
+    "DATABASE_PASSWORD" = base64encode("postgres") # Default password for platform service
+    "DATABASE_URL"      = base64encode("postgresql://${local.database_username}:postgres@postgresql-dev.platform-dev.svc.cluster.local:5432/${local.database_name}")
 
-    # Storage secrets
-    "STORAGE_ACCESS_KEY" = var.storage.enabled && var.cluster_type == "local" ? base64encode(module.storage[0].access_key) : ""
-    "STORAGE_SECRET_KEY" = var.storage.enabled && var.cluster_type == "local" ? base64encode(module.storage[0].secret_key) : ""
+    # Storage secrets - using platform-wide MinIO service
+    "STORAGE_ACCESS_KEY" = base64encode("minioadmin") # Default access key for platform service
+    "STORAGE_SECRET_KEY" = base64encode("minioadmin") # Default secret key for platform service
 
-    # Cache secrets
-    "CACHE_AUTH_TOKEN" = var.cache.enabled && var.cluster_type != "local" ? base64encode(module.cache[0].auth_token) : ""
+    # Cache secrets - using platform-wide Redis service (no auth for local)
+    "CACHE_AUTH_TOKEN" = ""
   }
 }
 
