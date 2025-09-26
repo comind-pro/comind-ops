@@ -294,6 +294,7 @@ coverage/
 # Local scripts
 local-*.sh
 dev-*.sh
+.claude/
 
 # ===================
 # CI/CD

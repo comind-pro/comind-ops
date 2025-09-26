@@ -1,0 +1,71 @@
+# Redis Platform Service Configuration
+# This chart wraps the Bitnami Redis chart for platform-wide Redis service
+
+redis:
+  enabled: true
+  
+  # Redis configuration
+  architecture: standalone
+  
+  # Authentication
+  auth:
+    enabled: false  # Disable auth for local development
+  
+  # Persistence
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: ""
+  
+  # Resources
+  master:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  
+  # Service configuration
+  master:
+    service:
+      type: ClusterIP
+      ports:
+        redis: 6379
+  
+  # Metrics
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false  # Disable if Prometheus not available
+  
+  # Security context
+  securityContext:
+    enabled: true
+    fsGroup: 1001
+    runAsUser: 1001
+    runAsGroup: 1001
+
+# Global settings
+global:
+  storageClass: ""
+
+# Service account
+serviceAccount:
+  create: true
+  name: ""
+
+# Pod security context
+podSecurityContext:
+  enabled: true
+  fsGroup: 1001
+
+# Network policy
+networkPolicy:
+  enabled: false
+
+# Ingress (disabled by default)
+ingress:
+  enabled: false

@@ -1,13 +1,14 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: hello-world-dev
+  name: postgresql-dev
   namespace: argocd
   labels:
-    app: hello-world
-    environment: dev
-    team: platform
-    component: application
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/instance: postgresql-dev
+    app.kubernetes.io/environment: dev
+    app.kubernetes.io/part-of: comind-ops-platform
+    app.kubernetes.io/component: database
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -15,16 +16,13 @@ spec:
   source:
     repoURL: https://github.com/comind-pro/comind-ops
     targetRevision: main
-    path: k8s/charts/apps/hello-world
+    path: k8s/charts/platform/postgresql
     helm:
       valueFiles:
         - values/dev.yaml
-      parameters:
-        - name: image.tag
-          value: "dev"
   destination:
     server: https://kubernetes.default.svc
-    namespace: hello-world-dev
+    namespace: platform-dev
   syncPolicy:
     automated:
       prune: true

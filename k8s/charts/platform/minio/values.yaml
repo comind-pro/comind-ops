@@ -1,0 +1,76 @@
+# MinIO Platform Service Configuration
+# This chart wraps the MinIO chart for platform-wide object storage service
+
+minio:
+  enabled: true
+  
+  # MinIO configuration
+  mode: standalone
+  
+  # Authentication
+  auth:
+    rootUser: "minioadmin"
+    rootPassword: "minioadmin"
+  
+  # Persistence
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  
+  # Resources
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    ports:
+      api: 9000
+      console: 9001
+  
+  # Console (Web UI)
+  console:
+    enabled: true
+    service:
+      type: ClusterIP
+  
+  # Metrics
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false  # Disable if Prometheus not available
+  
+  # Security context
+  securityContext:
+    enabled: true
+    fsGroup: 1001
+    runAsUser: 1001
+    runAsGroup: 1001
+
+# Global settings
+global:
+  storageClass: ""
+
+# Service account
+serviceAccount:
+  create: true
+  name: ""
+
+# Pod security context
+podSecurityContext:
+  enabled: true
+  fsGroup: 1001
+
+# Network policy
+networkPolicy:
+  enabled: false
+
+# Ingress (disabled by default)
+ingress:
+  enabled: false

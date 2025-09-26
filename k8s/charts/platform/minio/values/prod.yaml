@@ -1,0 +1,33 @@
+# Production environment overrides for MinIO
+
+minio:
+  # High resources for production
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  
+  # Large storage for production
+  persistence:
+    size: 100Gi
+  
+  # High availability
+  mode: distributed
+  replicas: 4
+  
+  # Enable metrics in production
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Global settings
+global:
+  storageClass: "gp3"  # Use AWS EBS GP3 for production
+
+# Network policy for production
+networkPolicy:
+  enabled: true

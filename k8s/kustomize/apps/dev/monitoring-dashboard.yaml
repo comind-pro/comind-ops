@@ -11,7 +11,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: platform-project
+  project: comind-ops-platform
   source:
     repoURL: https://github.com/comind-pro/comind-ops
     targetRevision: main

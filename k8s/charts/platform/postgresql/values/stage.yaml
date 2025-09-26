@@ -1,0 +1,27 @@
+# Staging environment overrides for PostgreSQL
+
+postgresql:
+  # Medium resources for staging
+  primary:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  
+  # Medium storage for staging
+  primary:
+    persistence:
+      size: 8Gi
+  
+  # Enable metrics in staging
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Global settings
+global:
+  storageClass: "gp2"  # Use AWS EBS for staging

@@ -1,0 +1,25 @@
+# Development environment overrides for Redis
+
+redis:
+  # Smaller resources for dev
+  master:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  
+  # Smaller storage for dev
+  master:
+    persistence:
+      size: 2Gi
+  
+  # Disable metrics in dev
+  metrics:
+    enabled: false
+
+# Global settings
+global:
+  storageClass: "local-path"  # Use local-path for k3d

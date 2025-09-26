@@ -11,56 +11,27 @@ output "namespace_labels" {
   value       = kubernetes_namespace.app.metadata[0].labels
 }
 
-# Database outputs
+# Database outputs - using platform-wide PostgreSQL service
 output "database" {
   description = "Database configuration and connection details"
-  value = var.database.enabled ? {
-    enabled           = true
-    endpoint          = module.database[0].endpoint
-    port              = module.database[0].port
-    database_name     = module.database[0].database_name
-    username          = module.database[0].username
-    connection_string = module.database[0].connection_string
-    readonly_endpoint = module.database[0].readonly_endpoint
-    engine            = module.database[0].engine
-    engine_version    = module.database[0].engine_version
-    multi_az          = module.database[0].multi_az
-    backup_retention  = module.database[0].backup_retention_period
-    } : {
+  value = {
     enabled = false
+    message = "Using platform-wide PostgreSQL service deployed via ArgoCD"
+    platform_service = "postgresql-dev.platform-dev.svc.cluster.local:5432"
   }
-  sensitive = true
+  sensitive = false
 }
 
-# Storage outputs
+# Storage outputs - using platform-wide MinIO service
 output "storage" {
   description = "Storage configuration and bucket details"
-  value = var.storage.enabled ? {
-    enabled      = true
-    endpoint     = module.storage[0].endpoint
-    access_key   = module.storage[0].access_key
-    secret_key   = module.storage[0].secret_key
-    bucket_names = module.storage[0].bucket_names
-    bucket_urls  = module.storage[0].bucket_urls
-    console_url  = module.storage[0].console_url
-    region       = module.storage[0].region
-    service_name = module.storage[0].service_name
-    service_port = module.storage[0].service_port
-    secure       = module.storage[0].secure_connection
-    } : {
-    enabled      = false
-    endpoint     = null
-    access_key   = null
-    secret_key   = null
-    bucket_names = []
-    bucket_urls  = []
-    console_url  = null
-    region       = null
-    service_name = null
-    service_port = null
-    secure       = null
+  value = {
+    enabled = false
+    message = "Using platform-wide MinIO service deployed via ArgoCD"
+    platform_service = "minio-dev.platform-dev.svc.cluster.local:9000"
+    console_service = "minio-dev-console.platform-dev.svc.cluster.local:9001"
   }
-  sensitive = true
+  sensitive = false
 }
 
 # Queue outputs
@@ -79,18 +50,15 @@ output "queue" {
   }
 }
 
-# Cache outputs
+# Cache outputs - using platform-wide Redis service
 output "cache" {
   description = "Cache configuration and connection details"
-  value = var.cache.enabled ? {
-    enabled    = true
-    endpoint   = module.cache[0].endpoint
-    port       = module.cache[0].port
-    auth_token = module.cache[0].auth_token
-    } : {
+  value = {
     enabled = false
+    message = "Using platform-wide Redis service deployed via ArgoCD"
+    platform_service = "redis-dev-master.platform-dev.svc.cluster.local:6379"
   }
-  sensitive = true
+  sensitive = false
 }
 
 # Networking outputs

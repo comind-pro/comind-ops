@@ -1,0 +1,47 @@
+# Production environment overrides for Redis
+
+redis:
+  # High resources for production
+  master:
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  
+  # Large storage for production
+  master:
+    persistence:
+      size: 20Gi
+  
+  # Enable authentication in production
+  auth:
+    enabled: true
+  
+  # Enable metrics in production
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+  
+  # High availability
+  architecture: replication
+  replica:
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Global settings
+global:
+  storageClass: "gp3"  # Use AWS EBS GP3 for production
+
+# Network policy for production
+networkPolicy:
+  enabled: true

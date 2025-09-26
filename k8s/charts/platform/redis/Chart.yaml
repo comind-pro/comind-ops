@@ -1,0 +1,21 @@
+apiVersion: v2
+name: redis
+description: Redis cache service for the Comind-Ops Platform
+type: application
+version: 0.1.0
+appVersion: "7.2"
+keywords:
+  - redis
+  - cache
+  - database
+home: https://redis.io
+sources:
+  - https://github.com/redis/redis
+maintainers:
+  - name: Comind-Ops Team
+    email: team@comind.pro
+dependencies:
+  - name: redis
+    version: "18.1.5"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled

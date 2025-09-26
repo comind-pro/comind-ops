@@ -1,0 +1,25 @@
+# Development environment overrides for PostgreSQL
+
+postgresql:
+  # Smaller resources for dev
+  primary:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  
+  # Smaller storage for dev
+  primary:
+    persistence:
+      size: 2Gi
+  
+  # Disable metrics in dev
+  metrics:
+    enabled: false
+
+# Global settings
+global:
+  storageClass: "local-path"  # Use local-path for k3d

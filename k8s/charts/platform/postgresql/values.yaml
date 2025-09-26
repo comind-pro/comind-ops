@@ -1,0 +1,74 @@
+# PostgreSQL Platform Service Configuration
+# This chart wraps the Bitnami PostgreSQL chart for platform-wide PostgreSQL service
+
+postgresql:
+  enabled: true
+  
+  # PostgreSQL configuration
+  architecture: standalone
+  
+  # Authentication
+  auth:
+    postgresPassword: "postgres"
+    username: "postgres"
+    password: "postgres"
+    database: "postgres"
+  
+  # Persistence
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: ""
+  
+  # Resources
+  primary:
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  
+  # Service configuration
+  primary:
+    service:
+      type: ClusterIP
+      ports:
+        postgresql: 5432
+  
+  # Metrics
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false  # Disable if Prometheus not available
+  
+  # Security context
+  securityContext:
+    enabled: true
+    fsGroup: 1001
+    runAsUser: 1001
+    runAsGroup: 1001
+
+# Global settings
+global:
+  storageClass: ""
+
+# Service account
+serviceAccount:
+  create: true
+  name: ""
+
+# Pod security context
+podSecurityContext:
+  enabled: true
+  fsGroup: 1001
+
+# Network policy
+networkPolicy:
+  enabled: false
+
+# Ingress (disabled by default)
+ingress:
+  enabled: false

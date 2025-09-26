@@ -11,7 +11,7 @@ metadata:
 spec:
   project: comind-ops-platform
   source:
-    repoURL: git@github.com:comind-pro/comind-ops.git
+    repoURL: file:///tmp/comind-ops.git
     targetRevision: main
     path: k8s/kustomize
     directory:

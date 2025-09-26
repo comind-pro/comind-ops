@@ -73,6 +73,12 @@ bootstrap: ## Complete cluster setup (core infrastructure + platform services)
 	@kubectl apply -k k8s/base/
 	@echo "$(YELLOW)Step 7/9: Deploying platform services...$(NC)"
 	@kubectl apply -k k8s/platform/
+	@echo "$(YELLOW)Step 7.1/9: Deploying Redis service...$(NC)"
+	@helm upgrade --install redis-dev k8s/charts/platform/redis -n platform-dev --create-namespace -f k8s/charts/platform/redis/values/dev.yaml
+	@echo "$(YELLOW)Step 7.2/9: Deploying PostgreSQL service...$(NC)"
+	@helm upgrade --install postgresql-dev k8s/charts/platform/postgresql -n platform-dev --create-namespace -f k8s/charts/platform/postgresql/values/dev.yaml
+	@echo "$(YELLOW)Step 7.3/9: Deploying MinIO service...$(NC)"
+	@helm upgrade --install minio-dev k8s/charts/platform/minio -n platform-dev --create-namespace -f k8s/charts/platform/minio/values/dev.yaml
 	@echo "$(YELLOW)Step 8/9: Setting up GitOps with ArgoCD...$(NC)"
 	@kubectl apply -f k8s/kustomize/root-app.yaml
 	@echo "$(YELLOW)Step 9/9: Deploying monitoring dashboard...$(NC)"

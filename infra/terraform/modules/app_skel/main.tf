@@ -118,37 +118,39 @@ resource "kubernetes_namespace" "app" {
 }
 
 # Include sub-modules based on cluster type and configuration
-module "database" {
-  source = "./modules/database"
-  count  = var.database.enabled ? 1 : 0
+# Database module disabled - using platform-wide PostgreSQL service
+# module "database" {
+#   source = "./modules/database"
+#   count  = var.database.enabled ? 1 : 0
+#
+#   app_name             = var.app_name
+#   environment          = var.environment
+#   cluster_type         = var.cluster_type
+#   kubernetes_namespace = kubernetes_namespace.app.metadata[0].name
+#
+#   database_config   = var.database
+#   database_name     = var.database.username != null ? var.database.database_name : local.database_name
+#   database_username = var.database.username != null ? var.database.username : local.database_username
+#   database_password = var.database.password != null ? var.database.password : random_password.database_password[0].result
+#
+#   tags = local.common_tags
+# }
 
-  app_name             = var.app_name
-  environment          = var.environment
-  cluster_type         = var.cluster_type
-  kubernetes_namespace = kubernetes_namespace.app.metadata[0].name
-
-  database_config   = var.database
-  database_name     = var.database.username != null ? var.database.database_name : local.database_name
-  database_username = var.database.username != null ? var.database.username : local.database_username
-  database_password = var.database.password != null ? var.database.password : random_password.database_password[0].result
-
-  tags = local.common_tags
-}
-
-module "storage" {
-  source = "./modules/storage"
-  count  = var.storage.enabled ? 1 : 0
-
-  app_name             = var.app_name
-  environment          = var.environment
-  cluster_type         = var.cluster_type
-  kubernetes_namespace = kubernetes_namespace.app.metadata[0].name
-
-  storage_config  = var.storage
-  storage_buckets = local.storage_buckets
-
-  tags = local.common_tags
-}
+# Storage module disabled - using platform-wide MinIO service
+# module "storage" {
+#   source = "./modules/storage"
+#   count  = var.storage.enabled ? 1 : 0
+#
+#   app_name             = var.app_name
+#   environment          = var.environment
+#   cluster_type         = var.cluster_type
+#   kubernetes_namespace = kubernetes_namespace.app.metadata[0].name
+#
+#   storage_config  = var.storage
+#   storage_buckets = local.storage_buckets
+#
+#   tags = local.common_tags
+# }
 
 module "queue" {
   source = "./modules/queue"
@@ -165,19 +167,20 @@ module "queue" {
   tags = local.common_tags
 }
 
-module "cache" {
-  source = "./modules/cache"
-  count  = var.cache.enabled ? 1 : 0
-
-  app_name             = var.app_name
-  environment          = var.environment
-  cluster_type         = var.cluster_type
-  kubernetes_namespace = kubernetes_namespace.app.metadata[0].name
-
-  cache_config = var.cache
-
-  tags = local.common_tags
-}
+# Cache module disabled - using platform-wide Redis service
+# module "cache" {
+#   source = "./modules/cache"
+#   count  = var.cache.enabled ? 1 : 0
+#
+#   app_name             = var.app_name
+#   environment          = var.environment
+#   cluster_type         = var.cluster_type
+#   kubernetes_namespace = kubernetes_namespace.app.metadata[0].name
+#
+#   cache_config = var.cache
+#
+#   tags = local.common_tags
+# }
 
 module "networking" {
   source = "./modules/networking"

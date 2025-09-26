@@ -1,0 +1,27 @@
+# Staging environment overrides for Redis
+
+redis:
+  # Medium resources for staging
+  master:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  
+  # Medium storage for staging
+  master:
+    persistence:
+      size: 8Gi
+  
+  # Enable metrics in staging
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Global settings
+global:
+  storageClass: "gp2"  # Use AWS EBS for staging

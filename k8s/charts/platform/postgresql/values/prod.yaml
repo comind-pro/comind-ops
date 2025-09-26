@@ -1,0 +1,43 @@
+# Production environment overrides for PostgreSQL
+
+postgresql:
+  # High resources for production
+  primary:
+    resources:
+      requests:
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+  
+  # Large storage for production
+  primary:
+    persistence:
+      size: 50Gi
+  
+  # High availability
+  architecture: replication
+  readReplicas:
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  
+  # Enable metrics in production
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Global settings
+global:
+  storageClass: "gp3"  # Use AWS EBS GP3 for production
+
+# Network policy for production
+networkPolicy:
+  enabled: true

@@ -1,0 +1,37 @@
+# Development environment overrides for MinIO
+
+minio:
+  # Smaller resources for dev
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  
+  # Smaller storage for dev
+  persistence:
+    size: 2Gi
+  
+  # Disable metrics in dev
+  metrics:
+    enabled: false
+  
+  # Security context for Pod Security Standards
+  securityContext:
+    enabled: true
+    fsGroup: 1001
+    runAsUser: 1001
+    runAsGroup: 1001
+    runAsNonRoot: true
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    seccompProfile:
+      type: RuntimeDefault
+
+# Global settings
+global:
+  storageClass: "local-path"  # Use local-path for k3d

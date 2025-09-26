@@ -1,0 +1,21 @@
+apiVersion: v2
+name: postgresql
+description: PostgreSQL database service for the Comind-Ops Platform
+type: application
+version: 0.1.0
+appVersion: "15.0"
+keywords:
+  - postgresql
+  - database
+  - sql
+home: https://www.postgresql.org
+sources:
+  - https://github.com/postgres/postgres
+maintainers:
+  - name: Comind-Ops Team
+    email: team@comind.pro
+dependencies:
+  - name: postgresql
+    version: "12.12.10"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled

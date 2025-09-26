@@ -1,0 +1,25 @@
+# Staging environment overrides for MinIO
+
+minio:
+  # Medium resources for staging
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Medium storage for staging
+  persistence:
+    size: 10Gi
+  
+  # Enable metrics in staging
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Global settings
+global:
+  storageClass: "gp2"  # Use AWS EBS for staging
