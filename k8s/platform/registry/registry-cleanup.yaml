@@ -26,6 +26,8 @@ spec:
               runAsNonRoot: true
               runAsUser: 1000
               fsGroup: 1000
+              seccompProfile:
+                type: RuntimeDefault
             containers:
             - name: regctl-cleanup
               image: regclient/regctl:v0.5.7
@@ -80,6 +82,9 @@ spec:
               securityContext:
                 allowPrivilegeEscalation: false
                 readOnlyRootFilesystem: true
+                runAsNonRoot: true
+                seccompProfile:
+                  type: RuntimeDefault
                 capabilities:
                   drop:
                   - ALL

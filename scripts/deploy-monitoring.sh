@@ -74,26 +74,32 @@ check_access() {
 
 echo -e "${BLUE}🚀 Deploying Monitoring Dashboard...${NC}"
 
-# Check if monitoring dashboard image exists locally
-if ! docker image inspect monitoring-dashboard:dev >/dev/null 2>&1; then
-    echo -e "${YELLOW}📦 Building monitoring dashboard image...${NC}"
-    docker build -t monitoring-dashboard:dev k8s/apps/monitoring-dashboard/
-    
-    echo -e "${YELLOW}📥 Importing image into k3d cluster...${NC}"
-    k3d image import monitoring-dashboard:dev -c comind-ops-dev
+# Check if monitoring dashboard app exists
+if [ ! -d "k8s/apps/monitoring-dashboard" ]; then
+    echo -e "${YELLOW}⚠️  Monitoring dashboard app not found. Skipping deployment...${NC}"
+    echo -e "${BLUE}💡 To create it, run: make new-app-full APP=monitoring-dashboard${NC}"
+else
+    # Check if monitoring dashboard image exists locally
+    if ! docker image inspect monitoring-dashboard:dev >/dev/null 2>&1; then
+        echo -e "${YELLOW}📦 Building monitoring dashboard image...${NC}"
+        docker build -t monitoring-dashboard:dev k8s/apps/monitoring-dashboard/
+
+        echo -e "${YELLOW}📥 Importing image into k3d cluster...${NC}"
+        k3d image import monitoring-dashboard:dev -c comind-ops-dev
+    fi
+
+    # Deploy monitoring dashboard using Helm
+    echo -e "${YELLOW}🔧 Deploying monitoring dashboard...${NC}"
+    helm upgrade --install monitoring-dashboard k8s/apps/monitoring-dashboard/chart \
+        -n monitoring-dashboard-dev \
+        --create-namespace \
+        -f k8s/apps/monitoring-dashboard/values/dev.yaml \
+        --wait
+
+    # Wait for deployment to be ready
+    echo -e "${YELLOW}⏳ Waiting for monitoring dashboard to be ready...${NC}"
+    kubectl wait --for=condition=available --timeout=300s deployment/monitoring-dashboard -n monitoring-dashboard-dev
 fi
-
-# Deploy monitoring dashboard using Helm
-echo -e "${YELLOW}🔧 Deploying monitoring dashboard...${NC}"
-helm upgrade --install monitoring-dashboard k8s/apps/monitoring-dashboard/chart \
-    -n monitoring-dashboard-dev \
-    --create-namespace \
-    -f k8s/apps/monitoring-dashboard/values/dev.yaml \
-    --wait
-
-# Wait for deployment to be ready
-echo -e "${YELLOW}⏳ Waiting for monitoring dashboard to be ready...${NC}"
-kubectl wait --for=condition=available --timeout=300s deployment/monitoring-dashboard -n monitoring-dashboard-dev
 
 # Check if ingress is accessible
 echo -e "${YELLOW}🔍 Checking ingress accessibility...${NC}"

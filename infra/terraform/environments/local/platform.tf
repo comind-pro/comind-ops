@@ -39,6 +39,10 @@ resource "null_resource" "create_namespaces" {
       kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
       kubectl label namespace argocd app.kubernetes.io/name=argocd app.kubernetes.io/part-of=comind-ops-platform --overwrite
       
+      # Create Sealed Secrets namespace
+      kubectl create namespace sealed-secrets --dry-run=client -o yaml | kubectl apply -f -
+      kubectl label namespace sealed-secrets app.kubernetes.io/name=sealed-secrets app.kubernetes.io/part-of=comind-ops-platform --overwrite
+      
       echo "Kubernetes namespaces created successfully"
     EOT
   }
@@ -204,194 +208,11 @@ resource "null_resource" "disable_ingress_nginx_webhook" {
   }
 }
 
-# Build and import Docker images for platform applications
-resource "null_resource" "build_and_import_images" {
-  count = var.cluster_type == "local" ? 1 : 0
-  
-  depends_on = [null_resource.kubeconfig_local]
-  
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Building and importing Docker images for platform applications..."
-      
-      # Build monitoring dashboard image
-      echo "Building monitoring-dashboard:dev image..."
-      docker build -t monitoring-dashboard:dev k8s/charts/apps/monitoring-dashboard/
-      
-      # Import images into k3d cluster
-      echo "Importing images into k3d cluster..."
-      k3d image import monitoring-dashboard:dev -c comind-ops-${var.environment}
-      
-      echo "Docker images built and imported successfully"
-    EOT
-  }
-  
-  triggers = {
-    monitoring_dashboard_dockerfile = filemd5("${path.module}/../../../../k8s/charts/apps/monitoring-dashboard/Dockerfile")
-    monitoring_dashboard_server = filemd5("${path.module}/../../../../k8s/charts/apps/monitoring-dashboard/server.js")
-    monitoring_dashboard_package = filemd5("${path.module}/../../../../k8s/charts/apps/monitoring-dashboard/package.json")
-  }
-}
+# Note: Docker image building moved to ArgoCD CI/CD pipeline
 
-# Deploy platform applications
-resource "null_resource" "deploy_platform_apps" {
-  count = var.cluster_type == "local" ? 1 : 0
-  
-  depends_on = [
-    null_resource.build_and_import_images,
-    null_resource.disable_ingress_nginx_webhook,
-    null_resource.install_argocd
-  ]
-  
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Deploying platform applications..."
-      
-      # Create namespaces
-      kubectl create namespace monitoring-dashboard-${var.environment} --dry-run=client -o yaml | kubectl apply -f -
-      kubectl create namespace elasticmq-${var.environment} --dry-run=client -o yaml | kubectl apply -f -
-      
-      # Deploy monitoring dashboard
-      echo "Deploying monitoring dashboard..."
-      helm upgrade --install monitoring-dashboard k8s/charts/apps/monitoring-dashboard \
-        -n monitoring-dashboard-${var.environment} \
-        -f k8s/charts/apps/monitoring-dashboard/values/${var.environment}.yaml \
-        --wait --timeout=5m
-      
-      # Deploy ElasticMQ
-      echo "Deploying ElasticMQ..."
-      helm upgrade --install elasticmq k8s/charts/platform/elasticmq \
-        -n elasticmq-${var.environment} \
-        -f k8s/charts/platform/elasticmq/values/${var.environment}.yaml \
-        --wait --timeout=5m
-      
-      echo "Platform applications deployed successfully"
-    EOT
-  }
-  
-  triggers = {
-    monitoring_dashboard_values = filemd5("${path.module}/../../../../k8s/charts/apps/monitoring-dashboard/values/${var.environment}.yaml")
-    elasticmq_values = filemd5("${path.module}/../../../../k8s/charts/platform/elasticmq/values/${var.environment}.yaml")
-    environment = var.environment
-  }
-}
+# Note: Platform application deployment moved to ArgoCD
 
-# Configure ArgoCD applications
-resource "null_resource" "configure_argocd_apps" {
-  count = var.cluster_type == "local" ? 1 : 0
-  
-  depends_on = [
-    null_resource.deploy_platform_apps,
-    null_resource.argocd_project,
-    null_resource.create_argocd_repo_secret
-  ]
-  
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Configuring ArgoCD applications..."
-      
-      # Wait for ArgoCD to be ready
-      echo "Waiting for ArgoCD to be ready..."
-      kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
-      
-      # Create ArgoCD applications
-      echo "Creating ArgoCD applications..."
-      
-      # Monitoring Dashboard Application
-      kubectl apply -f - <<EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: monitoring-dashboard-${var.environment}
-  namespace: argocd
-  labels:
-    app: monitoring-dashboard
-    environment: ${var.environment}
-    team: platform
-    component: application
-spec:
-  project: comind-ops-platform
-  source:
-    repoURL: file:///tmp/comind-ops.git
-    targetRevision: main
-    path: k8s/charts/apps/monitoring-dashboard
-    helm:
-      valueFiles:
-        - values/${var.environment}.yaml
-      parameters:
-        - name: image.tag
-          value: "${var.environment}"
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: monitoring-dashboard-${var.environment}
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-      - ApplyOutOfSyncOnly=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
-  revisionHistoryLimit: 10
-EOF
-
-      # ElasticMQ Application
-      kubectl apply -f - <<EOF
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: elasticmq-${var.environment}
-  namespace: argocd
-  labels:
-    app: elasticmq
-    environment: ${var.environment}
-    team: platform
-    component: infrastructure
-spec:
-  project: comind-ops-platform
-  source:
-    repoURL: file:///tmp/comind-ops.git
-    targetRevision: main
-    path: k8s/charts/platform/elasticmq
-    helm:
-      valueFiles:
-        - values/${var.environment}.yaml
-      parameters:
-        - name: image.tag
-          value: "1.4.0"
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: elasticmq-${var.environment}
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-    syncOptions:
-      - CreateNamespace=true
-      - ApplyOutOfSyncOnly=true
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
-  revisionHistoryLimit: 10
-EOF
-      
-      echo "ArgoCD applications configured successfully"
-    EOT
-  }
-  
-  triggers = {
-    environment = var.environment
-    argocd_project = null_resource.argocd_project[0].id
-  }
-}
+# Note: ArgoCD application configuration moved to GitOps
 
 # ====================================================
 # SEALED SECRETS
@@ -442,20 +263,8 @@ resource "null_resource" "install_argocd" {
     command = <<-EOT
       echo "Installing ArgoCD..."
       
-      # Add ArgoCD Helm repository
-      helm repo add argo https://argoproj.github.io/argo-helm
-      helm repo update
-      
-      # Install ArgoCD
-      helm upgrade --install argocd argo/argo-cd \
-        --version 5.49.0 \
-        --namespace argocd \
-        --values ${path.module}/../../templates/argocd-values.yaml \
-        --set global.domain=argocd.${var.environment}.${var.domain_suffix} \
-        --set server.ingress.enabled=true \
-        --set server.ingress.hosts[0]=argocd.${var.environment}.${var.domain_suffix} \
-        --set server.ingress.ingressClassName=nginx \
-        --wait --timeout=10m
+      # Use the dedicated ArgoCD installation script
+      ENVIRONMENT=${var.environment} ${path.module}/../../scripts/install-argocd.sh
       
       echo "ArgoCD installed successfully"
     EOT
@@ -465,6 +274,7 @@ resource "null_resource" "install_argocd" {
     namespaces_created = null_resource.create_namespaces[0].id
     environment = var.environment
     domain_suffix = var.domain_suffix
+    script_version = "2.1"
   }
 }
 
@@ -535,6 +345,11 @@ resource "null_resource" "argocd_project" {
       # Wait for ArgoCD to be ready
       kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
       
+      # Wait for ArgoCD CRDs to be available
+      echo "Waiting for ArgoCD CRDs to be available..."
+      kubectl wait --for condition=established --timeout=60s crd/applications.argoproj.io
+      kubectl wait --for condition=established --timeout=60s crd/appprojects.argoproj.io
+      
       # Create ArgoCD project
       kubectl apply -f - <<EOF
 apiVersion: argoproj.io/v1alpha1
@@ -551,7 +366,6 @@ spec:
   sourceRepos:
     - ${var.repo_url}
     - https://github.com/comind-pro/*
-    - file:///tmp/comind-ops.git
   destinations:
     - namespace: "*"
       server: https://kubernetes.default.svc
@@ -607,41 +421,4 @@ EOF
   }
 }
 
-# Create ArgoCD repository secret
-resource "null_resource" "create_argocd_repo_secret" {
-  count = var.cluster_type == "local" ? 1 : 0
-  
-  depends_on = [null_resource.install_argocd]
-  
-  provisioner "local-exec" {
-    command = <<-EOT
-      echo "Creating ArgoCD repository secret..."
-      
-      # Wait for ArgoCD to be ready
-      kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd
-      
-      # Create repository secret
-      kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Secret
-metadata:
-  name: comind-ops-repo
-  namespace: argocd
-  labels:
-    argocd.argoproj.io/secret-type: repository
-type: Opaque
-stringData:
-  type: git
-  url: file:///tmp/comind-ops.git
-  name: comind-ops
-  insecure: "true"
-EOF
-      
-      echo "ArgoCD repository secret created successfully"
-    EOT
-  }
-  
-  triggers = {
-    argocd_installed = null_resource.install_argocd[0].id
-  }
-}
+# Note: ArgoCD repository configuration moved to GitOps

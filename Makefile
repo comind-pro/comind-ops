@@ -66,7 +66,7 @@ help: ## Show this help message
 # ===========================================
 
 .PHONY: bootstrap
-bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Services)
+bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Services) 🚀
 	@echo "$(BLUE)🏗️  Bootstrapping Comind-Ops Platform...$(NC)"
 	@echo "$(YELLOW)Phase 1: Environment Validation$(NC)"
 	@echo "$(YELLOW)Step 1/10: Validating environment configuration...$(NC)"
@@ -96,15 +96,22 @@ bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Servi
 		./infra/terraform/scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE) -var="environments=[\"$(ENV)\"]" -var="multi_environment=false"; \
 	fi
 	@echo "$(YELLOW)Step 6/10: Waiting for cluster to be ready...$(NC)"
-	@sleep 30
-	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || echo "ArgoCD still starting..."
+	@kubectl wait --for=condition=ready node --all --timeout=300s
+	@echo "$(YELLOW)Step 6a/10: Waiting for ArgoCD to be ready...$(NC)"
+	@for i in 1 2 3 4 5 6; do \
+		if kubectl get deployment argocd-server -n argocd >/dev/null 2>&1; then \
+			kubectl wait --for=condition=available --timeout=60s deployment/argocd-server -n argocd && break; \
+		fi; \
+		echo "Waiting for ArgoCD deployment (attempt $$i/6)..."; \
+		sleep 10; \
+	done
 	@echo "$(YELLOW)Step 7/10: Applying base Kubernetes resources...$(NC)"
 	@kubectl apply -k k8s/base/
 	@echo "$(YELLOW)Step 8/10: Deploying platform services...$(NC)"
 	@kubectl apply -k k8s/platform/
 	@if echo "$(ENV)" | grep -q ","; then \
 		echo "$(BLUE)Deploying services for environments: $(ENV)$(NC)"; \
-		for env in $(subst ,, ,$(ENV)); do \
+		for env in $(shell echo "$(ENV)" | tr ',' ' '); do \
 			echo "$(YELLOW)Deploying services for $$env environment...$(NC)"; \
 			helm upgrade --install redis-$$env k8s/charts/platform/redis -n platform-$$env --create-namespace -f k8s/charts/platform/redis/values/$$env.yaml; \
 			helm upgrade --install postgresql-$$env k8s/charts/platform/postgresql -n platform-$$env --create-namespace -f k8s/charts/platform/postgresql/values/$$env.yaml; \
@@ -131,6 +138,11 @@ bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Servi
 	@echo "  ✅ Monitoring: Dashboard and access setup"
 	@echo ""
 	@$(MAKE) --no-print-directory status
+
+.PHONY: bootstrap-enhanced
+bootstrap-enhanced: ## Enhanced bootstrap with better error handling and retries
+	@echo "$(BLUE)🚀 Using enhanced bootstrap process...$(NC)"
+	@PROFILE=$(PROFILE) ENV=$(ENV) ./scripts/bootstrap-enhanced.sh
 
 setup-env: ## Setup environment configuration
 	@echo "$(BLUE)🔧 Setting up environment configuration...$(NC)"
@@ -230,8 +242,34 @@ argo-apps: ## List all ArgoCD applications
 	@echo "$(BLUE)📱 ArgoCD Applications:$(NC)"
 	@kubectl get applications -n argocd -o custom-columns="NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,REPO:.spec.source.repoURL"
 
+.PHONY: gitops-status
+gitops-status: ## Check GitOps and ArgoCD status
+	@echo "$(BLUE)🔍 GitOps Status Check$(NC)"
+	@echo ""
+	@echo "$(YELLOW)ArgoCD Server:$(NC)"
+	@kubectl get deployment argocd-server -n argocd >/dev/null 2>&1 && echo "$(GREEN)✅ ArgoCD is running$(NC)" || echo "$(RED)❌ ArgoCD is not running$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Applications:$(NC)"
+	@kubectl get applications -n argocd 2>/dev/null || echo "$(YELLOW)No applications found$(NC)"
+	@echo ""
+	@echo "$(YELLOW)Application Projects:$(NC)"
+	@kubectl get appprojects -n argocd 2>/dev/null || echo "$(YELLOW)No projects found$(NC)"
+
 # ===========================================
-# 📱 APPLICATION MANAGEMENT  
+# 📊 MONITORING & OBSERVABILITY
+# ===========================================
+
+.PHONY: monitoring-access
+monitoring-access: ## Access monitoring dashboard
+	@echo "$(BLUE)📊 Setting up monitoring dashboard access...$(NC)"
+	@./scripts/deploy-monitoring.sh check || ./scripts/deploy-monitoring.sh port-forward
+	@echo ""
+	@echo "$(GREEN)Access monitoring dashboard at:$(NC)"
+	@echo "  Direct: http://monitoring.dev.127.0.0.1.nip.io:8080"
+	@echo "  Port-forward: http://localhost:8081"
+
+# ===========================================
+# 📱 APPLICATION MANAGEMENT
 # ===========================================
 
 .PHONY: new-app
@@ -371,7 +409,7 @@ deploy: ## Deploy all platform services and applications
 	@echo "$(GREEN)✅ Platform deployed successfully!$(NC)"
 
 .PHONY: status
-monitoring-access: ## Check monitoring dashboard access
+monitoring-check: ## Check monitoring dashboard access
 	@echo "$(BLUE)🔍 Checking monitoring dashboard access...$(NC)"
 	@./scripts/deploy-monitoring.sh check
 
@@ -391,7 +429,7 @@ app-registry: ## Start app registry web interface
 	@echo "$(BLUE)🌐 Starting app registry web interface...$(NC)"
 	@python3 scripts/app-registry-api.py
 
-gitops-status: ## Show GitOps status (ArgoCD applications)
+gitops-detailed: ## Show detailed GitOps status (ArgoCD applications)
 	@echo "$(BLUE)📊 GitOps Status (ArgoCD Applications)$(NC)"
 	@echo ""
 	@echo "$(GREEN)Applications:$(NC)"

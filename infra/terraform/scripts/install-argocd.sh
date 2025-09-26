@@ -9,11 +9,12 @@ helm repo update
 cat > /tmp/argocd-values.yaml << EOF
 global:
   domain: argocd.${ENVIRONMENT}.127.0.0.1.nip.io
+
 configs:
   params:
     server.insecure: true
     server.disable.auth: false
-  repositories: |
+  repositories:
     - url: https://github.com/comind-pro/comind-ops
       name: comind-ops-platform
       type: git
@@ -23,6 +24,7 @@ configs:
         hs = {}
         hs.status = "Healthy"
         return hs
+
 rbac:
   policy.default: role:readonly
   policy.csv: |
@@ -48,9 +50,10 @@ rbac:
     g, admin, role:admin
     # Bind readonly role to all users by default
     g, argocd, role:readonly
+
 server:
   service:
-    type: LoadBalancer
+    type: ClusterIP
   ingress:
     enabled: true
     ingressClassName: nginx
@@ -60,12 +63,20 @@ server:
       - secretName: argocd-server-tls
         hosts:
           - argocd.${ENVIRONMENT}.127.0.0.1.nip.io
+  extraArgs:
+    - --insecure
+
+dex:
+  enabled: false
+
+redis:
+  enabled: true
 EOF
 
 helm upgrade --install argocd argo/argo-cd \
   --version 5.51.6 \
   --namespace argocd \
   --values /tmp/argocd-values.yaml \
-  --wait
+  --wait --timeout=10m
 
 echo "✅ ArgoCD installed"

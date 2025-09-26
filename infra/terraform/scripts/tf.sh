@@ -107,6 +107,7 @@ while [[ $# -gt 0 ]]; do
         --auto-approve) AUTO_APPROVE=true; shift ;;
         --var-file) VAR_FILE="$2"; shift 2 ;;
         --target) TARGET="$2"; shift 2 ;;
+        -target=*) TARGET="${1#*=}"; shift ;;
         --workspace) WORKSPACE="$2"; shift 2 ;;
         --profile) PROFILE="$2"; shift 2 ;;
         -var=*) TF_VARS+=("$1"); shift ;;
@@ -283,7 +284,9 @@ if [[ "$AUTO_APPROVE" == "true" && ("$COMMAND" == "apply" || "$COMMAND" == "dest
     TF_ARGS+=("-auto-approve")
 fi
 # Add custom variables
-TF_ARGS+=("${TF_VARS[@]}")
+if [[ ${#TF_VARS[@]} -gt 0 ]]; then
+    TF_ARGS+=("${TF_VARS[@]}")
+fi
 
 # Select workspace
 if terraform workspace list | grep -q "$WORKSPACE"; then
