@@ -4,10 +4,10 @@ Complete cloud-native platform built on Kubernetes, featuring automated GitOps w
 
 ## ✨ Key Features
 
-- **🏗️ Multi-Environment Support**: Seamless deployment across local (k3d), AWS, and DigitalOcean
-- **🚀 GitOps Automation**: ArgoCD-powered continuous deployment with ApplicationSets  
+- **🏗️ Multi-Environment Support**: Seamless deployment across local (k3d) and AWS environments
+- **🚀 GitOps Automation**: ArgoCD-powered continuous deployment with Helm charts
 - **🔒 Enterprise Security**: Sealed secrets, RBAC, network policies, and Pod Security Standards
-- **📊 Complete Observability**: Prometheus monitoring, centralized logging, and health checks
+- **📊 Complete Observability**: Monitoring dashboard, centralized logging, and health checks
 - **🛠️ Developer Experience**: One-command app scaffolding, automated infrastructure provisioning
 - **📦 External Data Services**: PostgreSQL and MinIO running as optimized Docker containers
 - **🎯 Production Ready**: High availability, disaster recovery, security scanning, and compliance
@@ -22,18 +22,19 @@ git clone https://github.com/comind-pro/comind-ops.git
 cd comind-ops
 
 # 2. Bootstrap the platform (one command setup!)
-make bootstrap
+make bootstrap PROFILE=local
 
 # 3. Access services
 make argo-login                    # ArgoCD dashboard
 make services-status               # Check external services
+make monitoring-access             # Monitoring dashboard
 open http://localhost:9001         # MinIO console
 
 # 4. Create your first application with infrastructure
 make new-app-full APP=my-api TEAM=backend
 
-# 5. Deploy the infrastructure
-make tf-apply-app APP=my-api
+# 5. Check GitOps status
+make gitops-status
 ```
 
 ## 🏗️ Architecture
@@ -46,7 +47,7 @@ make tf-apply-app APP=my-api
 │  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐  │
 │  │   DEVELOPMENT   │  │     STAGING     │  │   PRODUCTION    │  │
 │  │                 │  │                 │  │                 │  │
-│  │ • Local k3d     │  │ • AWS/DO Cloud  │  │ • AWS/DO Cloud  │  │
+│  │ • Local k3d     │  │ • AWS Cloud     │  │ • AWS Cloud     │  │
 │  │ • Auto Deploy   │  │ • Tag Deploy    │  │ • Manual Approval│  │
 │  │ • Debug Mode    │  │ • Prod-like     │  │ • Blue/Green    │  │
 │  └─────────────────┘  └─────────────────┘  └─────────────────┘  │
@@ -85,7 +86,7 @@ make tf-apply-app APP=my-api
 ## 🛠 Technologies
 
 **Infrastructure & Platform:**
-- **Kubernetes**: k3d locally, AWS EKS/DigitalOcean in cloud
+- **Kubernetes**: k3d locally, AWS EKS in cloud
 - **Terraform**: Infrastructure as code for all environments
 - **ArgoCD**: GitOps continuous deployment and application management
 - **Helm**: Package management for Kubernetes applications
@@ -116,18 +117,18 @@ make tf-apply-app APP=my-api
 
 ```bash
 # Complete platform setup
-make bootstrap                     # Full platform bootstrap
+make bootstrap PROFILE=local      # Full platform bootstrap
 
 # External services management  
-make services-start               # Start PostgreSQL & MinIO
+make services-setup               # Start PostgreSQL & MinIO
 make services-stop                # Stop external services
 make services-status              # Check service health
 make services-backup              # Create backups
 
 # Kubernetes cluster operations
 make validate                     # Validate all configurations
-make deploy                       # Deploy platform services
 make status                       # Platform status overview
+make gitops-status                # ArgoCD GitOps status
 ```
 
 ### **🔧 Application Development**
@@ -138,10 +139,9 @@ make new-app-full APP=my-service TEAM=backend    # Full-stack app with DB
 make new-app-api APP=my-api TEAM=backend         # API service
 make new-app-worker APP=worker TEAM=data        # Background worker
 
-# Infrastructure provisioning
-make tf-plan-app APP=my-service                  # Plan infrastructure
-make tf-apply-app APP=my-service                 # Deploy infrastructure
-make tf-destroy-app APP=my-service               # Clean up infrastructure
+# Infrastructure provisioning (via ArgoCD GitOps)
+make new-app-full APP=my-service TEAM=backend    # Create app with infrastructure
+make gitops-status                                # Check deployment status
 
 # Secret management
 make seal-secret APP=my-service ENV=dev FILE=secrets.yaml
@@ -257,14 +257,16 @@ kubectl get pods -n hello-world-dev
 
 ### **4. Access Services**
 - **ArgoCD**: `http://argocd.dev.127.0.0.1.nip.io:8080`
+- **Monitoring Dashboard**: `make monitoring-access`
 - **MinIO Console**: `http://localhost:9001`
-- **PostgreSQL**: `psql -h localhost -p 5432 -U comind_ops_user -d comind_ops`
+- **PostgreSQL**: `psql -h localhost -p 5432 -U postgres -d comind_ops_dev`
 
 ---
 
 ## 📚 Documentation
 
 ### **Core Guides**
+- **[Infrastructure Flow](docs/INFRASTRUCTURE_FLOW.md)**: Complete infrastructure flow and phases
 - **[Architecture](docs/infra-architecture.md)**: Complete system architecture and design
 - **[Onboarding](docs/onboarding.md)**: Step-by-step developer onboarding
 - **[External Services](docs/external-services.md)**: PostgreSQL and MinIO management

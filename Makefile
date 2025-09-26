@@ -23,11 +23,12 @@ help: ## Show this help message
 	@echo "$(BLUE)Comind-Ops Platform - Available Commands$(NC)"
 	@echo ""
 	@echo "$(GREEN)🚀 Quick Start:$(NC)"
-	@echo "  make bootstrap                    # Complete cluster setup"
+	@echo "  make bootstrap                    # Complete infrastructure setup (Terraform + ArgoCD)"
+	@echo "  make services-setup               # Start external services (PostgreSQL, MinIO)"
 	@echo "  make argo-login                   # Get ArgoCD admin credentials"
 	@echo "  make new-app-full APP=my-api      # Create application with infrastructure"
-	@echo "  make tf-apply-app APP=my-api      # Provision application infrastructure"
-	@echo "  make deploy                       # Deploy all platform services"
+	@echo "  make gitops-status                # Check ArgoCD GitOps status"
+	@echo "  make monitoring-access            # Access monitoring dashboard"
 	@echo ""
 	@echo "$(GREEN)📋 Available Commands:$(NC)"
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(YELLOW)%-25s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -40,23 +41,25 @@ help: ## Show this help message
 	@echo "  PROFILE    Infrastructure profile (local, aws) [default: $(PROFILE)]"
 	@echo ""
 	@echo "$(GREEN)💡 Examples:$(NC)"
-	@echo "  make bootstrap PROFILE=aws"
+	@echo "  make bootstrap PROFILE=local      # Local development setup"
+	@echo "  make bootstrap PROFILE=aws        # AWS production setup"
+	@echo "  make services-setup               # Start external services"
 	@echo "  make new-app-full APP=payment-api TEAM=backend"
-	@echo "  make tf-apply-app APP=payment-api"
-	@echo "  make tf ENV=prod APP=my-app COMMAND=apply PROFILE=aws"
-	@echo "  make clean-env                  # Complete environment cleanup"
-	@echo "  make seal APP=my-app ENV=stage FILE=secret.yaml"
+	@echo "  make gitops-status                # Check ArgoCD status"
+	@echo "  make monitoring-access            # Access monitoring dashboard"
+	@echo "  make clean-env                    # Complete environment cleanup"
 
 # ===========================================
 # 🏗️  INFRASTRUCTURE & BOOTSTRAP
 # ===========================================
 
 .PHONY: bootstrap
-bootstrap: ## Complete cluster setup (core infrastructure + platform services)
+bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Services)
 	@echo "$(BLUE)🏗️  Bootstrapping Comind-Ops Platform...$(NC)"
+	@echo "$(YELLOW)Phase 1: Terraform Infrastructure Setup$(NC)"
 	@echo "$(YELLOW)Step 1/9: Checking dependencies...$(NC)"
 	@./scripts/check-deps.sh
-	@echo "$(YELLOW)Step 2/9: Starting external services...$(NC)"
+	@echo "$(YELLOW)Step 2/9: Starting external services (local only)...$(NC)"
 	@if [ "$(PROFILE)" = "local" ]; then \
 		$(MAKE) --no-print-directory services-setup; \
 	else \
@@ -79,11 +82,19 @@ bootstrap: ## Complete cluster setup (core infrastructure + platform services)
 	@helm upgrade --install postgresql-dev k8s/charts/platform/postgresql -n platform-dev --create-namespace -f k8s/charts/platform/postgresql/values/dev.yaml
 	@echo "$(YELLOW)Step 7.3/9: Deploying MinIO service...$(NC)"
 	@helm upgrade --install minio-dev k8s/charts/platform/minio -n platform-dev --create-namespace -f k8s/charts/platform/minio/values/dev.yaml
+	@echo "$(YELLOW)Phase 2: ArgoCD GitOps Setup$(NC)"
 	@echo "$(YELLOW)Step 8/9: Setting up GitOps with ArgoCD...$(NC)"
 	@kubectl apply -f k8s/kustomize/root-app.yaml
+	@echo "$(YELLOW)Phase 3: Monitoring and Access$(NC)"
 	@echo "$(YELLOW)Step 9/9: Deploying monitoring dashboard...$(NC)"
 	@./scripts/deploy-monitoring.sh
 	@echo "$(GREEN)✅ Bootstrap complete!$(NC)"
+	@echo ""
+	@echo "$(BLUE)📋 Infrastructure Flow Summary:$(NC)"
+	@echo "  ✅ Terraform: K8s cluster, ArgoCD, initial platform setup"
+	@echo "  ✅ External Services: PostgreSQL, MinIO (local only)"
+	@echo "  ✅ ArgoCD: Platform services, application infrastructure"
+	@echo "  ✅ Monitoring: Dashboard and access setup"
 	@echo ""
 	@$(MAKE) --no-print-directory status
 

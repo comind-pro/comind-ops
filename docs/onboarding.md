@@ -80,15 +80,17 @@ tree -d -L 2
 ### 2.1 Complete Bootstrap
 
 ```bash
-make bootstrap
+make bootstrap PROFILE=local
 ```
 
 This will:
-1. Initialize Terraform
-2. Create k3d cluster with networking  
+1. Check dependencies and start external services
+2. Initialize Terraform and create k3d cluster
 3. Install ArgoCD, ingress-nginx, sealed-secrets
 4. Deploy base Kubernetes resources
-5. Install platform services (ElasticMQ, Registry, Backups)
+5. Deploy platform services (Redis, PostgreSQL, MinIO)
+6. Setup GitOps with ArgoCD
+7. Deploy monitoring dashboard
 
 **Expected Duration**: 5-10 minutes
 
@@ -123,17 +125,21 @@ make argo-login
 
 Access URLs:
 - ArgoCD: http://argocd.dev.127.0.0.1.nip.io:8080
-- ElasticMQ: http://elasticmq.dev.127.0.0.1.nip.io:8080
-- Registry: http://registry.dev.127.0.0.1.nip.io:8080
+- Monitoring Dashboard: `make monitoring-access`
+- MinIO Console: http://localhost:9001
+- PostgreSQL: `psql -h localhost -p 5432 -U postgres -d comind_ops_dev`
 
 ### 3.2 Verify Services
 
 ```bash
-# Test ElasticMQ API
-curl http://elasticmq.dev.127.0.0.1.nip.io:8080/queue/default
-
 # Check ArgoCD Applications
 kubectl get applications -n argocd
+
+# Check GitOps status
+make gitops-status
+
+# Check platform services
+kubectl get pods -n platform-dev
 ```
 
 ## Step 4: Deploy Your First Application
@@ -141,19 +147,14 @@ kubectl get applications -n argocd
 ### 4.1 Create a New Application
 
 ```bash
-make new-app APP=hello-world TEAM=onboarding
+make new-app-full APP=hello-world TEAM=onboarding
 ```
 
 ### 4.2 Customize the Application
 
 ```bash
 # Use nginx image for demo
-cat > k8s/apps/hello-world/values/dev.yaml << 'EOF'
-global:
-  environment: dev
-  domain: dev.127.0.0.1.nip.io
-  namespace: hello-world-dev
-
+cat > k8s/charts/apps/hello-world/values/dev.yaml << 'EOF'
 image:
   repository: nginx
   tag: "1.21"
@@ -162,6 +163,7 @@ service:
   port: 80
 
 ingress:
+  enabled: true
   hosts:
     - host: hello-world.dev.127.0.0.1.nip.io
       paths:
@@ -214,6 +216,9 @@ git push origin main
 # Watch ArgoCD sync
 kubectl get applications -n argocd -w
 
+# Check GitOps status
+make gitops-status
+
 # Check pods
 kubectl get pods -n hello-world-dev -w
 
@@ -234,7 +239,7 @@ curl http://hello-world.dev.127.0.0.1.nip.io:8080
 
 ```bash
 # Scale to 2 replicas
-sed -i 's/replicaCount: 1/replicaCount: 2/' k8s/apps/hello-world/values/dev.yaml
+sed -i 's/replicaCount: 1/replicaCount: 2/' k8s/charts/apps/hello-world/values/dev.yaml
 
 git add -A && git commit -m "Scale to 2 replicas" && git push
 
@@ -248,15 +253,15 @@ kubectl get pods -n hello-world-dev -w
 
 ```bash
 make status          # Platform health
-make logs APP=hello-world  # Application logs
-make shell           # Debug shell
+make gitops-status   # ArgoCD GitOps status
+make monitoring-access # Access monitoring dashboard
 ```
 
 ### 6.2 Backup Operations
 
 ```bash
-kubectl get cronjobs -n backup-system
-kubectl logs -l app=postgres-backup -n backup-system
+make services-backup  # Create backups of external services
+make services-status  # Check service health
 ```
 
 ### 6.3 Secret Management
@@ -272,20 +277,20 @@ make seal APP=hello-world ENV=dev FILE=new-secret.yaml
 
 ```bash
 # Backend API
-make new-app APP=payment-api TEAM=backend --with-database --port=3000
+make new-app-full APP=payment-api TEAM=backend
 
 # Frontend App  
-make new-app APP=web-ui TEAM=frontend --language=node --port=3000
+make new-app-full APP=web-ui TEAM=frontend
 
 # Background Worker
-make new-app APP=email-worker TEAM=backend --with-queue
+make new-app-full APP=email-worker TEAM=backend
 ```
 
 ### Multi-Environment Deployment
 
 ```bash
 # Create staging configuration
-cp k8s/apps/hello-world/values/dev.yaml k8s/apps/hello-world/values/stage.yaml
+cp k8s/charts/apps/hello-world/values/dev.yaml k8s/charts/apps/hello-world/values/stage.yaml
 # Edit stage.yaml for staging-specific settings
 
 # Seal staging secrets  
@@ -297,9 +302,9 @@ git add -A && git commit -m "Add staging environment" && git push
 ### Environment Management
 
 ```bash
-make bootstrap ENV=stage    # Bootstrap staging
-make tf-apply ENV=prod      # Deploy to production  
-make status ENV=prod        # Check production status
+make bootstrap PROFILE=aws  # Bootstrap AWS environment
+make gitops-status          # Check GitOps status
+make status                 # Check platform status
 ```
 
 ## Troubleshooting
@@ -315,7 +320,8 @@ make cleanup && make bootstrap  # Clean retry
 #### Applications Won't Deploy
 ```bash
 kubectl logs -n argocd deployment/argocd-server
-argocd app sync my-app-dev  # Manual sync
+make gitops-status  # Check ArgoCD status
+kubectl get applications -n argocd
 ```
 
 #### Secrets Not Working
@@ -327,6 +333,7 @@ make seal APP=my-app ENV=dev FILE=secret.yaml --force
 #### Can't Access Services
 ```bash
 kubectl get ingress -A
+make monitoring-access  # Access monitoring dashboard
 kubectl port-forward service/my-app 8080:80 -n my-app-dev
 ```
 
@@ -340,9 +347,9 @@ kubectl port-forward service/my-app 8080:80 -n my-app-dev
 ## Next Steps
 
 ### Development Workflow
-- Use `make shell` for cluster debugging
+- Use `make gitops-status` for ArgoCD status
 - Port forward services for testing
-- Monitor with `make logs`
+- Monitor with `make monitoring-access`
 
 ### Production Readiness  
 - Set up monitoring and alerting
@@ -353,9 +360,9 @@ kubectl port-forward service/my-app 8080:80 -n my-app-dev
 
 You now have:
 - ✅ Complete Comind-Ops Platform running locally
-- ✅ ArgoCD managing GitOps workflows
-- ✅ Your first application deployed  
-- ✅ Understanding of platform operations
+- ✅ ArgoCD managing GitOps workflows with Helm charts
+- ✅ Your first application deployed via GitOps
+- ✅ Understanding of platform operations and infrastructure flow
 
 The platform is ready for your team to build and deploy applications with confidence, security, and automation.
 

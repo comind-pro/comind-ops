@@ -237,11 +237,43 @@ module "docker_services" {
 
 ## Service Types
 
-### Core Services
-- **postgresql**: Database service
-- **minio**: Object storage service
-- **redis**: Caching service (optional)
-- **elasticmq**: Message queue service (optional)
+### Required Services (Local Environment)
+- **postgresql**: Database service - **REQUIRED**
+  - Provides database for all applications
+  - Port: 5432
+  - Database: `comind_ops_dev`
+  - Username: `postgres`, Password: `postgres`
+
+- **minio**: Object storage service - **REQUIRED**
+  - S3-compatible object storage
+  - Port: 9000 (API), 9001 (Console)
+  - Access Key: `minioadmin`, Secret Key: `minioadmin`
+
+### Optional Services (Local Environment)
+- **redis**: Caching service - **OPTIONAL**
+  - Port: 6379
+  - No authentication (local dev only)
+
+- **elasticmq**: Message queue service - **OPTIONAL**
+  - SQS-compatible message queue
+  - Port: 9324 (HTTP), 9325 (HTTPS)
+
+### Service Dependencies
+```
+Terraform Bootstrap
+└── External Services Validation
+    ├── PostgreSQL (REQUIRED)
+    ├── MinIO (REQUIRED)
+    ├── Redis (OPTIONAL)
+    └── ElasticMQ (OPTIONAL)
+
+ArgoCD GitOps
+└── Platform Services (K8s)
+    ├── Redis (platform-wide)
+    ├── PostgreSQL (platform-wide)
+    ├── MinIO (platform-wide)
+    └── ElasticMQ (platform-wide)
+```
 
 ### External Services
 - **external**: Generic service for any Docker image

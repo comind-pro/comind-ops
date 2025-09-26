@@ -42,19 +42,23 @@ The Comind-Ops Platform uses external Docker containers for data storage service
 ### PostgreSQL Database
 
 - **Container Name**: `comind-ops-postgres`
-- **Image**: `postgres:16-alpine`
+- **Image**: `postgres:15-alpine`
 - **Port**: `5432`
 - **Network IP**: `172.20.0.10`
-- **Databases**: `comind_ops`, `sample_app_dev`, `sample_app_stage`, `sample_app_prod`
-- **Features**: Multi-database setup, optimized configuration, automated backups
+- **Databases**: `comind_ops_dev`
+- **Username**: `postgres`
+- **Password**: `postgres`
+- **Features**: Optimized configuration, automated backups
 
 ### MinIO Object Storage
 
 - **Container Name**: `comind-ops-minio`
-- **Image**: `minio/minio:latest`
+- **Image**: `minio/minio:RELEASE.2023-09-30T07-02-29Z`
 - **Ports**: `9000` (API), `9001` (Console)
 - **Network IP**: `172.20.0.20`
-- **Buckets**: `app-data`, `backups`, `logs`, `uploads`, `artifacts`
+- **Access Key**: `minioadmin`
+- **Secret Key**: `minioadmin`
+- **Buckets**: `uploads`, `backups`, `logs`
 - **Features**: S3-compatible API, web console, lifecycle policies, automated backups
 
 ## Management Commands
@@ -63,7 +67,7 @@ The Comind-Ops Platform uses external Docker containers for data storage service
 
 ```bash
 # Start all external services
-make services-start
+make services-setup
 
 # Stop all external services
 make services-stop
@@ -132,12 +136,12 @@ nano infra/docker/.env
 ENV=dev
 
 # PostgreSQL
-POSTGRES_PASSWORD=secure_password_change_me
-POSTGRES_USER=comind_ops_user
+POSTGRES_PASSWORD=postgres
+POSTGRES_USER=postgres
 
 # MinIO
 MINIO_ROOT_USER=minioadmin
-MINIO_ROOT_PASSWORD=minioadmin123
+MINIO_ROOT_PASSWORD=minioadmin
 
 # Backups
 BACKUP_RETENTION_DAYS=7
@@ -158,26 +162,22 @@ Services are connected via a dedicated Docker network:
 
 From host machine:
 ```bash
-psql -h localhost -p 5432 -U comind_ops_user -d comind_ops
+psql -h localhost -p 5432 -U postgres -d comind_ops_dev
 ```
 
 From Kubernetes pods:
 ```bash
 # Using external service name
-psql -h sample-app-postgres-external -p 5432 -U sample_app_user -d sample_app_dev
+psql -h host.docker.internal -p 5432 -U postgres -d comind_ops_dev
 ```
 
 ### Database Structure
 
-- **comind_ops**: Main platform database
-- **sample_app_dev**: Development environment database
-- **sample_app_stage**: Staging environment database  
-- **sample_app_prod**: Production environment database
+- **comind_ops_dev**: Main platform database for development
 
 ### Users and Permissions
 
-- `comind_ops_user`: Main platform user
-- `sample_app_user`: Application-specific user with limited permissions
+- `postgres`: Main platform user with full permissions
 - `backup_user`: Read-only user for backup operations
 
 ## Object Storage Management
@@ -185,18 +185,16 @@ psql -h sample-app-postgres-external -p 5432 -U sample_app_user -d sample_app_de
 ### MinIO Access
 
 **Web Console**: http://localhost:9001
-- Username: `minioadmin` (or configured value)
-- Password: `minioadmin123` (or configured value)
+- Username: `minioadmin`
+- Password: `minioadmin`
 
 **API Endpoint**: http://localhost:9000
 
 ### Bucket Structure
 
-- `app-data`: Application runtime data
+- `uploads`: User-uploaded content
 - `backups`: Automated backup storage
 - `logs`: Application and platform logs
-- `uploads`: User-uploaded content
-- `artifacts`: Build artifacts and deployments
 
 ### Using MinIO CLI
 
@@ -205,7 +203,7 @@ psql -h sample-app-postgres-external -p 5432 -U sample_app_user -d sample_app_de
 brew install minio/stable/mc
 
 # Configure alias
-mc alias set local http://localhost:9000 minioadmin minioadmin123
+mc alias set local http://localhost:9000 minioadmin minioadmin
 
 # List buckets
 mc ls local
@@ -298,7 +296,7 @@ make services-backup
 
 **PostgreSQL**: 
 ```bash
-docker exec comind-ops-postgres pg_isready -U comind_ops_user -d comind_ops
+docker exec comind-ops-postgres pg_isready -U postgres -d comind_ops_dev
 ```
 
 **MinIO**:

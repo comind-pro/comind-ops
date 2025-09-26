@@ -1,37 +1,52 @@
 # Service Registry Configuration
 # Central registry for all Docker services
 # YAML format for easy parsing
+#
+# INFRASTRUCTURE FLOW:
+# 1. Terraform manages: K8s cluster, ArgoCD, initial platform setup
+# 2. Docker services provide: External dependencies (local env only)
+# 3. ArgoCD manages: Platform services (K8s), application infrastructure
 
 services:
-  # Core Platform Services
+  # REQUIRED SERVICES (Local Environment Only)
+  # These services are required for local development
+  # In production (AWS), these are replaced by managed services
+  
   postgresql:
     enabled: true
+    required: true
+    description: "Database service - REQUIRED for local development"
     module: postgresql
     config:
       version: "15-alpine"
       port: 5432
       database: "comind_ops_dev"
-      username: "comind_ops_user"
-      password: "comind_ops_password"
+      username: "postgres"
+      password: "postgres"
       data_directory: "./data/postgresql"
       backup_enabled: true
       backup_schedule: "0 2 * * *"
     dependencies: []
     healthcheck:
-      command: "pg_isready -U ${username}"
+      command: "pg_isready -U postgres"
       interval: "30s"
       timeout: "10s"
       retries: 3
+    integration:
+      terraform_validation: true
+      argocd_platform_service: "postgresql-dev.platform-dev.svc.cluster.local:5432"
 
   minio:
     enabled: true
+    required: true
+    description: "Object storage service - REQUIRED for local development"
     module: minio
     config:
-      version: "latest"
+      version: "RELEASE.2023-09-30T07-02-29Z"
       console_port: 9001
       api_port: 9000
-      access_key: "comind_ops_minio_admin"
-      secret_key: "comind_ops_minio_password"
+      access_key: "minioadmin"
+      secret_key: "minioadmin"
       data_directory: "./data/minio"
       buckets: ["uploads", "backups", "logs"]
     dependencies: []
@@ -40,14 +55,22 @@ services:
       interval: "30s"
       timeout: "10s"
       retries: 3
+    integration:
+      terraform_validation: true
+      argocd_platform_service: "minio-dev.platform-dev.svc.cluster.local:9000"
 
+  # OPTIONAL SERVICES (Local Environment)
+  # These services are optional and can be enabled as needed
+  
   redis:
     enabled: false
+    required: false
+    description: "Caching service - OPTIONAL for local development"
     module: redis
     config:
-      version: "7-alpine"
+      version: "7.2-alpine"
       port: 6379
-      password: "comind_ops_redis_password"
+      password: ""
       data_directory: "./data/redis"
       persistence: true
     dependencies: []
@@ -56,12 +79,17 @@ services:
       interval: "30s"
       timeout: "10s"
       retries: 3
+    integration:
+      terraform_validation: false
+      argocd_platform_service: "redis-dev-master.platform-dev.svc.cluster.local:6379"
 
   elasticmq:
     enabled: false
+    required: false
+    description: "Message queue service - OPTIONAL for local development"
     module: elasticmq
     config:
-      version: "latest"
+      version: "1.4.2"
       port: 9324
       data_directory: "./data/elasticmq"
       queues: ["default", "notifications", "processing"]
@@ -71,6 +99,9 @@ services:
       interval: "30s"
       timeout: "10s"
       retries: 3
+    integration:
+      terraform_validation: false
+      argocd_platform_service: "elasticmq.platform-dev.svc.cluster.local:9324"
 
   # External Services (can be added later)
   external_example:
@@ -106,9 +137,22 @@ discovery:
     backup_enabled: true
     monitoring_enabled: true
   
-  # External service integration
-  external_services:
-    enabled: true
+  # Infrastructure flow integration
+  infrastructure_flow:
+    # Phase 1: Terraform validation
+    terraform_validation: true
+    validation_script: "check-external-services.sh"
+    
+    # Phase 2: Docker services (local only)
+    docker_services: true
+    required_services: ["postgresql", "minio"]
+    optional_services: ["redis", "elasticmq"]
+    
+    # Phase 3: ArgoCD platform services
+    argocd_platform_services: true
+    platform_namespace: "platform-dev"
+    
+    # Service discovery
     discovery_method: "registry"
     config_source: "terraform"
     update_strategy: "rolling"
