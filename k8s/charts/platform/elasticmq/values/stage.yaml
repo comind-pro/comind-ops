@@ -1,0 +1,31 @@
+# Staging environment values for elasticmq
+replicaCount: 2
+
+image:
+  tag: "1.4.0"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: elasticmq.stage.comind.pro
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+persistence:
+  enabled: true
+  size: 5Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70

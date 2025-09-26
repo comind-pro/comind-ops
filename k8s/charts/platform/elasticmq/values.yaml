@@ -1,0 +1,108 @@
+# Default values for elasticmq
+replicaCount: 1
+
+image:
+  repository: softwaremill/elasticmq-native
+  pullPolicy: IfNotPresent
+  tag: "1.4.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext:
+  fsGroup: 2000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  runAsNonRoot: true
+  runAsUser: 1000
+
+service:
+  type: ClusterIP
+  port: 9324
+  targetPort: 9324
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+  hosts:
+    - host: elasticmq.dev.127.0.0.1.nip.io
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 3
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# ElasticMQ configuration
+elasticmq:
+  config: |
+    include classpath("application.conf")
+    
+    # What is the outside visible address of this ElasticMQ node
+    # Used to create the queue and to communicate with other nodes
+    rest-sqs {
+      enabled = true
+      bind-port = 9324
+      bind-hostname = "0.0.0.0"
+    }
+    
+    # Should the node-address be generated from the bind port/hostname
+    # Set this to false e.g. when port forwarding
+    generate-node-address = true
+    
+    # Queues
+    queues {
+      notifications {
+        defaultVisibilityTimeoutSeconds = 10
+        delaySeconds = 5
+        receiveMessageWaitSeconds = 0
+      }
+    }
+
+# Persistence
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+
+# Health checks
+healthCheck:
+  enabled: true
+  path: /health
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3

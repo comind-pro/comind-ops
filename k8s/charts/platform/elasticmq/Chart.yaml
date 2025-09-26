@@ -1,0 +1,34 @@
+apiVersion: v2
+name: elasticmq
+description: ElasticMQ - SQS-compatible message queue for Comind-Ops Platform
+type: application
+version: 0.1.0
+appVersion: "1.4.0"
+kubeVersion: ">= 1.23.0-0"
+
+# Metadata
+maintainers:
+  - name: Comind-Ops Platform Team
+    email: platform@comind-ops.dev
+
+# Classification
+keywords:
+  - elasticmq
+  - sqs
+  - message-queue
+  - infrastructure
+  - platform
+  - comind-ops
+
+home: https://github.com/comind-pro/comind-ops/tree/main/k8s/charts/infra/elasticmq
+sources:
+  - https://github.com/comind-pro/comind-ops/tree/main/k8s/charts/infra/elasticmq
+
+annotations:
+  category: Infrastructure
+  platform.comind-ops.io/team: platform
+  platform.comind-ops.io/type: infrastructure
+  platform.comind-ops.io/service: message-queue
+  platform.comind-ops.io/ingress: enabled
+  platform.comind-ops.io/monitoring: enabled
+  platform.comind-ops.io/persistence: enabled

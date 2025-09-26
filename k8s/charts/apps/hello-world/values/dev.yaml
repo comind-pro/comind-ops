@@ -1,0 +1,29 @@
+# Development environment values for hello-world
+replicaCount: 1
+
+image:
+  tag: "dev"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: hello-world.dev.127.0.0.1.nip.io
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  limits:
+    cpu: 100m
+    memory: 128Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+autoscaling:
+  enabled: false
+
+html:
+  title: "Hello World - Dev Environment"
+  message: "Welcome to the Comind-Ops Platform Development Environment!"
+  description: "This is the development version of the sample application."

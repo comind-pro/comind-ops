@@ -32,10 +32,10 @@ output "argocd_credentials" {
   description = "ArgoCD admin credentials"
   value = {
     username = "admin"
-    password = data.external.argocd_password.result.password
+    password = data.external.argocd_password_local[0].result.password
   }
   sensitive  = true
-  depends_on = [null_resource.wait_for_argocd]
+  depends_on = [null_resource.wait_for_argocd_local]
 }
 
 output "registry_endpoint" {

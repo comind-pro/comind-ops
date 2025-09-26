@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: elasticmq-dev
+  namespace: argocd
+  labels:
+    app: elasticmq
+    environment: dev
+    team: platform
+    component: infrastructure
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/comind-pro/comind-ops
+    targetRevision: main
+    path: k8s/charts/infra/elasticmq
+    helm:
+      valueFiles:
+        - values/dev.yaml
+      parameters:
+        - name: image.tag
+          value: "1.4.0"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: elasticmq-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10

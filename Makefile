@@ -54,25 +54,29 @@ help: ## Show this help message
 .PHONY: bootstrap
 bootstrap: ## Complete cluster setup (core infrastructure + platform services)
 	@echo "$(BLUE)🏗️  Bootstrapping Comind-Ops Platform...$(NC)"
-	@echo "$(YELLOW)Step 1/7: Checking dependencies...$(NC)"
+	@echo "$(YELLOW)Step 1/9: Checking dependencies...$(NC)"
 	@./scripts/check-deps.sh
-	@echo "$(YELLOW)Step 2/7: Starting external services...$(NC)"
+	@echo "$(YELLOW)Step 2/9: Starting external services...$(NC)"
 	@if [ "$(PROFILE)" = "local" ]; then \
 		$(MAKE) --no-print-directory services-setup; \
 	else \
 		echo "$(BLUE)Skipping Docker services for $(PROFILE) profile - using cloud services$(NC)"; \
 	fi
-	@echo "$(YELLOW)Step 3/7: Initializing Terraform...$(NC)"
+	@echo "$(YELLOW)Step 3/9: Initializing Terraform...$(NC)"
 	@terraform -chdir=infra/terraform/environments/$(PROFILE) init
-	@echo "$(YELLOW)Step 4/7: Deploying core infrastructure...$(NC)"
+	@echo "$(YELLOW)Step 4/9: Deploying core infrastructure...$(NC)"
 	@./scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE)
-	@echo "$(YELLOW)Step 5/7: Waiting for cluster to be ready...$(NC)"
+	@echo "$(YELLOW)Step 5/9: Waiting for cluster to be ready...$(NC)"
 	@sleep 30
 	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || echo "ArgoCD still starting..."
-	@echo "$(YELLOW)Step 6/7: Applying base Kubernetes resources...$(NC)"
+	@echo "$(YELLOW)Step 6/9: Applying base Kubernetes resources...$(NC)"
 	@kubectl apply -k k8s/base/
-	@echo "$(YELLOW)Step 7/7: Deploying platform services...$(NC)"
+	@echo "$(YELLOW)Step 7/9: Deploying platform services...$(NC)"
 	@kubectl apply -k k8s/platform/
+	@echo "$(YELLOW)Step 8/9: Setting up GitOps with ArgoCD...$(NC)"
+	@kubectl apply -f k8s/kustomize/root-app.yaml
+	@echo "$(YELLOW)Step 9/9: Deploying monitoring dashboard...$(NC)"
+	@./scripts/deploy-monitoring.sh
 	@echo "$(GREEN)✅ Bootstrap complete!$(NC)"
 	@echo ""
 	@$(MAKE) --no-print-directory status
@@ -301,6 +305,38 @@ deploy: ## Deploy all platform services and applications
 	@echo "$(GREEN)✅ Platform deployed successfully!$(NC)"
 
 .PHONY: status
+monitoring-access: ## Check monitoring dashboard access
+	@echo "$(BLUE)🔍 Checking monitoring dashboard access...$(NC)"
+	@./scripts/deploy-monitoring.sh check
+
+monitoring-port-forward: ## Set up port forwarding for monitoring dashboard
+	@echo "$(BLUE)🔗 Setting up port forwarding for monitoring dashboard...$(NC)"
+	@./scripts/deploy-monitoring.sh port-forward
+
+monitoring-proxy: ## Start monitoring dashboard proxy (accessible at http://localhost:8081)
+	@echo "$(BLUE)🚀 Starting monitoring dashboard proxy...$(NC)"
+	@python3 scripts/simple-monitoring-proxy.py 8081
+
+register-app: ## Register a new application (interactive)
+	@echo "$(BLUE)📝 Registering new application...$(NC)"
+	@./scripts/register-app.sh
+
+app-registry: ## Start app registry web interface
+	@echo "$(BLUE)🌐 Starting app registry web interface...$(NC)"
+	@python3 scripts/app-registry-api.py
+
+gitops-status: ## Show GitOps status (ArgoCD applications)
+	@echo "$(BLUE)📊 GitOps Status (ArgoCD Applications)$(NC)"
+	@echo ""
+	@echo "$(GREEN)Applications:$(NC)"
+	@kubectl get applications -n argocd -o wide
+	@echo ""
+	@echo "$(GREEN)ApplicationSets:$(NC)"
+	@kubectl get applicationsets -n argocd -o wide
+	@echo ""
+	@echo "$(GREEN)Projects:$(NC)"
+	@kubectl get appprojects -n argocd -o wide
+
 status: ## Show overall platform status
 	@echo "$(BLUE)📊 comind-ops Platform Status$(NC)"
 	@echo ""

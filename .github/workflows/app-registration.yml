@@ -1,0 +1,358 @@
+name: App Registration Pipeline
+
+on:
+  repository_dispatch:
+    types: [app-registered]
+  workflow_dispatch:
+    inputs:
+      app_name:
+        description: 'Application name'
+        required: true
+        type: string
+      app_type:
+        description: 'Application type (platform/user)'
+        required: true
+        type: choice
+        options:
+          - platform
+          - user
+      team:
+        description: 'Team name'
+        required: true
+        type: string
+      repository_url:
+        description: 'Repository URL'
+        required: true
+        type: string
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate-registration:
+    name: Validate App Registration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup yq
+        uses: mikefarah/yq@v4.35.1
+
+      - name: Validate app registration
+        run: |
+          echo "🔍 Validating app registration..."
+          
+          # Get app details from inputs or event
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            APP_NAME="${{ github.event.inputs.app_name }}"
+            APP_TYPE="${{ github.event.inputs.app_type }}"
+            TEAM="${{ github.event.inputs.team }}"
+            REPO_URL="${{ github.event.inputs.repository_url }}"
+          else
+            APP_NAME="${{ github.event.client_payload.app_name }}"
+            APP_TYPE="${{ github.event.client_payload.app_type }}"
+            TEAM="${{ github.event.client_payload.team }}"
+            REPO_URL="${{ github.event.client_payload.repository_url }}"
+          fi
+          
+          echo "App: $APP_NAME"
+          echo "Type: $APP_TYPE"
+          echo "Team: $TEAM"
+          echo "Repository: $REPO_URL"
+          
+          # Validate inputs
+          if [ -z "$APP_NAME" ] || [ -z "$APP_TYPE" ] || [ -z "$TEAM" ] || [ -z "$REPO_URL" ]; then
+            echo "❌ Missing required parameters"
+            exit 1
+          fi
+          
+          # Check if app already exists
+          if [ -d "k8s/charts/$APP_TYPE/$APP_NAME" ]; then
+            echo "❌ Application $APP_NAME already exists"
+            exit 1
+          fi
+          
+          echo "✅ App registration validation passed"
+
+  create-helm-chart:
+    name: Create Helm Chart
+    runs-on: ubuntu-latest
+    needs: validate-registration
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.12.0'
+
+      - name: Setup yq
+        uses: mikefarah/yq@v4.35.1
+
+      - name: Create Helm chart
+        run: |
+          echo "📦 Creating Helm chart..."
+          
+          # Get app details
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            APP_NAME="${{ github.event.inputs.app_name }}"
+            APP_TYPE="${{ github.event.inputs.app_type }}"
+            TEAM="${{ github.event.inputs.team }}"
+            REPO_URL="${{ github.event.inputs.repository_url }}"
+          else
+            APP_NAME="${{ github.event.client_payload.app_name }}"
+            APP_TYPE="${{ github.event.client_payload.app_type }}"
+            TEAM="${{ github.event.client_payload.team }}"
+            REPO_URL="${{ github.event.client_payload.repository_url }}"
+          fi
+          
+          # Create chart directory
+          mkdir -p "k8s/charts/$APP_TYPE/$APP_NAME"
+          
+          # Create Chart.yaml
+          cat > "k8s/charts/$APP_TYPE/$APP_NAME/Chart.yaml" << EOF
+          apiVersion: v2
+          name: $APP_NAME
+          description: $APP_NAME application
+          type: application
+          version: 0.1.0
+          appVersion: "1.0.0"
+          kubeVersion: ">= 1.23.0-0"
+          
+          maintainers:
+            - name: $TEAM Team
+              email: $TEAM@comind-ops.dev
+          
+          keywords:
+            - $APP_NAME
+            - $APP_TYPE
+            - platform
+            - comind-ops
+          
+          home: $REPO_URL
+          sources:
+            - $REPO_URL
+          
+          annotations:
+            category: $([ "$APP_TYPE" = "platform" ] && echo "Infrastructure" || echo "Applications")
+            platform.comind-ops.io/team: $TEAM
+            platform.comind-ops.io/type: $APP_TYPE
+            platform.comind-ops.io/ingress: enabled
+            platform.comind-ops.io/monitoring: enabled
+          EOF
+          
+          # Create values.yaml
+          cat > "k8s/charts/$APP_TYPE/$APP_NAME/values.yaml" << EOF
+          # Default values for $APP_NAME
+          replicaCount: 1
+          
+          image:
+            repository: nginx
+            pullPolicy: IfNotPresent
+            tag: "latest"
+          
+          service:
+            type: ClusterIP
+            port: 8080
+          
+          ingress:
+            enabled: true
+            className: "nginx"
+            hosts:
+              - host: $APP_NAME.dev.127.0.0.1.nip.io
+                paths:
+                  - path: /
+                    pathType: Prefix
+          
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 250m
+              memory: 256Mi
+          EOF
+          
+          # Create values directory and environment files
+          mkdir -p "k8s/charts/$APP_TYPE/$APP_NAME/values"
+          
+          for env in dev stage prod; do
+            cat > "k8s/charts/$APP_TYPE/$APP_NAME/values/$env.yaml" << EOF
+          # $env environment values for $APP_NAME
+          replicaCount: $([ "$env" = "dev" ] && echo "1" || [ "$env" = "stage" ] && echo "2" || echo "3")
+          
+          image:
+            tag: "$env"
+          
+          ingress:
+            enabled: true
+            hosts:
+              - host: $APP_NAME.$env.127.0.0.1.nip.io
+                paths:
+                  - path: /
+                    pathType: Prefix
+          
+          resources:
+            limits:
+              cpu: $([ "$env" = "dev" ] && echo "500m" || [ "$env" = "stage" ] && echo "1000m" || echo "2000m")
+              memory: $([ "$env" = "dev" ] && echo "512Mi" || [ "$env" = "stage" ] && echo "1Gi" || echo "2Gi")
+            requests:
+              cpu: $([ "$env" = "dev" ] && echo "250m" || [ "$env" = "stage" ] && echo "500m" || echo "1000m")
+              memory: $([ "$env" = "dev" ] && echo "256Mi" || [ "$env" = "stage" ] && echo "512Mi" || echo "1Gi")
+          EOF
+          done
+          
+          # Create basic templates
+          mkdir -p "k8s/charts/$APP_TYPE/$APP_NAME/templates"
+          
+          # Use helm create to generate basic templates
+          helm create "k8s/charts/$APP_TYPE/$APP_NAME" --starter 2>/dev/null || true
+          
+          echo "✅ Helm chart created for $APP_NAME"
+
+  create-argocd-apps:
+    name: Create ArgoCD Applications
+    runs-on: ubuntu-latest
+    needs: create-helm-chart
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup yq
+        uses: mikefarah/yq@v4.35.1
+
+      - name: Create ArgoCD applications
+        run: |
+          echo "🚀 Creating ArgoCD applications..."
+          
+          # Get app details
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            APP_NAME="${{ github.event.inputs.app_name }}"
+            APP_TYPE="${{ github.event.inputs.app_type }}"
+            TEAM="${{ github.event.inputs.team }}"
+            REPO_URL="${{ github.event.inputs.repository_url }}"
+          else
+            APP_NAME="${{ github.event.client_payload.app_name }}"
+            APP_TYPE="${{ github.event.client_payload.app_type }}"
+            TEAM="${{ github.event.client_payload.team }}"
+            REPO_URL="${{ github.event.client_payload.repository_url }}"
+          fi
+          
+          # Create ArgoCD applications for each environment
+          for env in dev stage prod; do
+            mkdir -p "k8s/kustomize/$APP_TYPE/$env"
+            
+            cat > "k8s/kustomize/$APP_TYPE/$env/$APP_NAME.yaml" << EOF
+          apiVersion: argoproj.io/v1alpha1
+          kind: Application
+          metadata:
+            name: $APP_NAME-$env
+            namespace: argocd
+            labels:
+              app: $APP_NAME
+              environment: $env
+              team: $TEAM
+              component: $APP_TYPE
+            finalizers:
+              - resources-finalizer.argocd.argoproj.io
+          spec:
+            project: platform-project
+            source:
+              repoURL: $REPO_URL
+              targetRevision: main
+              path: k8s/charts/$APP_TYPE/$APP_NAME
+              helm:
+                valueFiles:
+                  - values/$env.yaml
+                parameters:
+                  - name: image.tag
+                    value: "$env"
+            destination:
+              server: https://kubernetes.default.svc
+              namespace: $APP_NAME-$env
+            syncPolicy:
+              automated:
+                prune: true
+                selfHeal: true
+              syncOptions:
+                - CreateNamespace=true
+                - ApplyOutOfSyncOnly=true
+              retry:
+                limit: 5
+                backoff:
+                  duration: 5s
+                  factor: 2
+                  maxDuration: 3m
+            revisionHistoryLimit: 10
+          EOF
+          done
+          
+          echo "✅ ArgoCD applications created for $APP_NAME"
+
+  commit-changes:
+    name: Commit Changes
+    runs-on: ubuntu-latest
+    needs: create-argocd-apps
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Commit and push changes
+        run: |
+          echo "📝 Committing changes..."
+          
+          # Get app details
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            APP_NAME="${{ github.event.inputs.app_name }}"
+            APP_TYPE="${{ github.event.inputs.app_type }}"
+            TEAM="${{ github.event.inputs.team }}"
+          else
+            APP_NAME="${{ github.event.client_payload.app_name }}"
+            APP_TYPE="${{ github.event.client_payload.app_type }}"
+            TEAM="${{ github.event.client_payload.team }}"
+          fi
+          
+          # Add all new files
+          git add "k8s/charts/$APP_TYPE/$APP_NAME/"
+          git add "k8s/kustomize/$APP_TYPE/*/$APP_NAME.yaml"
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "feat: register $APP_NAME application for $TEAM team
+
+            - Created Helm chart in k8s/charts/$APP_TYPE/$APP_NAME/
+            - Created ArgoCD applications for dev, stage, prod environments
+            - Application type: $APP_TYPE
+            - Team: $TEAM"
+            
+            git push
+            echo "✅ Changes committed and pushed"
+          fi
+
+  notify-completion:
+    name: Notify Completion
+    runs-on: ubuntu-latest
+    needs: commit-changes
+    if: always()
+    steps:
+      - name: Notify Success
+        if: needs.commit-changes.result == 'success'
+        run: |
+          echo "✅ App registration completed successfully!"
+          # Add notification logic here (Slack, Teams, etc.)
+
+      - name: Notify Failure
+        if: needs.commit-changes.result == 'failure'
+        run: |
+          echo "❌ App registration failed!"
+          # Add notification logic here (Slack, Teams, etc.)

@@ -1,0 +1,31 @@
+# Production environment values for elasticmq
+replicaCount: 3
+
+image:
+  tag: "1.4.0"
+
+ingress:
+  enabled: true
+  hosts:
+    - host: elasticmq.comind.pro
+      paths:
+        - path: /
+          pathType: Prefix
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 1000m
+    memory: 1Gi
+
+persistence:
+  enabled: true
+  size: 50Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 60

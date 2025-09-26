@@ -15,7 +15,9 @@ spec:
     # Source repositories allowed for this project
     sourceRepos:
     - 'https://github.com/comind-pro/comind-ops'
+    - 'git@github.com:comind-pro/comind-ops.git'
     - 'https://github.com/comind-pro/*'  # Allow other org repos, add your own repo here
+    - 'git@github.com:comind-pro/*'  # Allow SSH access to org repos
     - 'https://helm.elastic.co'  # Elastic Helm charts
     - 'https://prometheus-community.github.io/helm-charts'  # Prometheus
     - 'https://grafana.github.io/helm-charts'  # Grafana

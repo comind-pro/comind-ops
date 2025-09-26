@@ -1,0 +1,35 @@
+apiVersion: v2
+name: hello-world
+description: Sample Hello World application for Comind-Ops Platform demonstration
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+kubeVersion: ">= 1.23.0-0"
+
+# Metadata
+maintainers:
+  - name: Comind-Ops Platform Team
+    email: platform@comind-ops.dev
+
+# Classification
+keywords:
+  - hello-world
+  - sample
+  - demo
+  - platform
+  - nginx
+  - comind-ops
+
+home: https://github.com/comind-pro/comind-ops/tree/main/k8s/charts/apps/hello-world
+sources:
+  - https://github.com/comind-pro/comind-ops/tree/main/k8s/charts/apps/hello-world
+
+annotations:
+  category: Sample Applications
+  platform.comind-ops.io/team: platform
+  platform.comind-ops.io/language: nginx
+  platform.comind-ops.io/database: none
+  platform.comind-ops.io/storage: none
+  platform.comind-ops.io/ingress: enabled
+  platform.comind-ops.io/monitoring: enabled
+  platform.comind-ops.io/autoscaling: disabled

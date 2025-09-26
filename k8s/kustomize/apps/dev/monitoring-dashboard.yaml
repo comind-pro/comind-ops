@@ -1,0 +1,41 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-dashboard-dev
+  namespace: argocd
+  labels:
+    app: monitoring-dashboard
+    environment: dev
+    team: platform
+    component: application
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform-project
+  source:
+    repoURL: https://github.com/comind-pro/comind-ops
+    targetRevision: main
+    path: k8s/charts/apps/monitoring-dashboard
+    helm:
+      valueFiles:
+        - values/dev.yaml
+      parameters:
+        - name: image.tag
+          value: "dev"
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring-dashboard-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  revisionHistoryLimit: 10

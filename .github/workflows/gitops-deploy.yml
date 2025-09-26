@@ -1,0 +1,241 @@
+name: GitOps Deployment Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'k8s/charts/**'
+      - 'k8s/kustomize/**'
+      - 'apps.yaml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'k8s/charts/**'
+      - 'k8s/kustomize/**'
+      - 'apps.yaml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  validate:
+    name: Validate GitOps Configuration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: '3.12.0'
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: '1.28.0'
+
+      - name: Setup yq
+        uses: mikefarah/yq@v4.35.1
+
+      - name: Validate Helm Charts
+        run: |
+          echo "🔍 Validating Helm charts..."
+          for chart in k8s/charts/*/*; do
+            if [ -d "$chart" ] && [ -f "$chart/Chart.yaml" ]; then
+              echo "Validating chart: $chart"
+              helm lint "$chart"
+              helm template test "$chart" --values "$chart/values/dev.yaml" > /dev/null
+            fi
+          done
+
+      - name: Validate ArgoCD Applications
+        run: |
+          echo "🔍 Validating ArgoCD applications..."
+          for app in k8s/kustomize/*/*/*.yaml; do
+            if [ -f "$app" ]; then
+              echo "Validating ArgoCD app: $app"
+              # Check if it's a valid Kubernetes YAML
+              kubectl apply --dry-run=client -f "$app"
+            fi
+          done
+
+      - name: Validate apps.yaml
+        run: |
+          echo "🔍 Validating apps.yaml..."
+          yq eval '.' apps.yaml > /dev/null
+          echo "✅ apps.yaml is valid YAML"
+
+  build-and-push:
+    name: Build and Push Images
+    runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'push'
+    strategy:
+      matrix:
+        app: [monitoring-dashboard, hello-world]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.app }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./k8s/charts/apps/${{ matrix.app }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  update-image-tags:
+    name: Update Image Tags
+    runs-on: ubuntu-latest
+    needs: [validate, build-and-push]
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup yq
+        uses: mikefarah/yq@v4.35.1
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Update image tags in values files
+        run: |
+          echo "🔄 Updating image tags..."
+          
+          # Get the current branch name
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "Branch: $BRANCH_NAME"
+          
+          # Update image tags for each environment
+          for env in dev stage prod; do
+            for app in monitoring-dashboard hello-world; do
+              values_file="k8s/charts/apps/$app/values/$env.yaml"
+              if [ -f "$values_file" ]; then
+                echo "Updating $values_file"
+                # Update image tag based on branch
+                if [ "$BRANCH_NAME" = "main" ]; then
+                  new_tag="prod"
+                elif [ "$BRANCH_NAME" = "develop" ]; then
+                  new_tag="stage"
+                else
+                  new_tag="dev"
+                fi
+                
+                yq eval ".image.tag = \"$new_tag\"" -i "$values_file"
+                echo "Updated $app/$env to tag: $new_tag"
+              fi
+            done
+          done
+
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then
+            echo "No changes to commit"
+          else
+            git add k8s/charts/apps/*/values/*.yaml
+            git commit -m "chore: update image tags for ${{ github.ref_name }} branch"
+            git push
+          fi
+
+  deploy:
+    name: Deploy to ArgoCD
+    runs-on: ubuntu-latest
+    needs: [validate, update-image-tags]
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: '1.28.0'
+
+      - name: Setup ArgoCD CLI
+        run: |
+          curl -sSL -o argocd-linux-amd64 https://github.com/argoproj/argo-cd/releases/latest/download/argocd-linux-amd64
+          sudo install -m 555 argocd-linux-amd64 /usr/local/bin/argocd
+          rm argocd-linux-amd64
+
+      - name: Configure kubectl
+        run: |
+          # This would need to be configured with your cluster credentials
+          echo "kubectl configuration would go here"
+          # kubectl config set-cluster ...
+          # kubectl config set-credentials ...
+          # kubectl config set-context ...
+
+      - name: Sync ArgoCD Applications
+        run: |
+          echo "🚀 Syncing ArgoCD applications..."
+          
+          # Get the current branch name
+          BRANCH_NAME=${GITHUB_REF#refs/heads/}
+          echo "Branch: $BRANCH_NAME"
+          
+          # Determine environment based on branch
+          if [ "$BRANCH_NAME" = "main" ]; then
+            ENV="prod"
+          elif [ "$BRANCH_NAME" = "develop" ]; then
+            ENV="stage"
+          else
+            ENV="dev"
+          fi
+          
+          echo "Deploying to environment: $ENV"
+          
+          # Sync applications for the target environment
+          for app_file in k8s/kustomize/*/$ENV/*.yaml; do
+            if [ -f "$app_file" ]; then
+              app_name=$(yq eval '.metadata.name' "$app_file")
+              echo "Syncing application: $app_name"
+              # argocd app sync "$app_name" --server argocd-server.argocd.svc.cluster.local
+            fi
+          done
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+    steps:
+      - name: Notify Success
+        if: needs.deploy.result == 'success'
+        run: |
+          echo "✅ Deployment successful!"
+          # Add notification logic here (Slack, Teams, etc.)
+
+      - name: Notify Failure
+        if: needs.deploy.result == 'failure'
+        run: |
+          echo "❌ Deployment failed!"
+          # Add notification logic here (Slack, Teams, etc.)
