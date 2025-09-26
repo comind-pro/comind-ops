@@ -84,3 +84,149 @@ variable "vpc_cidr" {
   type        = string
   default     = "10.0.0.0/16"
 }
+
+# Repository configuration
+variable "repo_url" {
+  description = "Repository URL (supports both private and public)"
+  type        = string
+  default     = "https://github.com/comind-pro/comind-ops"
+}
+
+variable "repo_type" {
+  description = "Repository type: 'public' or 'private'"
+  type        = string
+  default     = "public"
+  validation {
+    condition     = contains(["public", "private"], var.repo_type)
+    error_message = "Repository type must be 'public' or 'private'."
+  }
+}
+
+# GitHub credentials for private repository access
+variable "github_username" {
+  description = "GitHub username for private repository access"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_token" {
+  description = "GitHub personal access token for private repository access"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_ssh_private_key" {
+  description = "GitHub SSH private key for repository access"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+# Multi-environment configuration
+variable "multi_environment" {
+  description = "Enable multiple environments in single cluster"
+  type        = bool
+  default     = false
+}
+
+variable "namespace_prefix" {
+  description = "Namespace prefix for environments"
+  type        = string
+  default     = "platform"
+}
+
+variable "domain_suffix" {
+  description = "Domain suffix for local environments"
+  type        = string
+  default     = "127.0.0.1.nip.io"
+}
+
+# Environment-specific configurations
+variable "environments" {
+  description = "List of environments to deploy"
+  type        = list(string)
+  default     = ["dev", "stage", "qa", "prod"]
+}
+
+variable "environment_configs" {
+  description = "Environment-specific configurations"
+  type = map(object({
+    namespace = string
+    domain    = string
+    replicas  = number
+    resources = object({
+      limits = object({
+        cpu    = string
+        memory = string
+      })
+      requests = object({
+        cpu    = string
+        memory = string
+      })
+    })
+  }))
+  default = {
+    dev = {
+      namespace = "platform-dev"
+      domain    = "dev.127.0.0.1.nip.io"
+      replicas  = 1
+      resources = {
+        limits = {
+          cpu    = "500m"
+          memory = "512Mi"
+        }
+        requests = {
+          cpu    = "100m"
+          memory = "128Mi"
+        }
+      }
+    }
+    stage = {
+      namespace = "platform-stage"
+      domain    = "stage.127.0.0.1.nip.io"
+      replicas  = 2
+      resources = {
+        limits = {
+          cpu    = "1000m"
+          memory = "1Gi"
+        }
+        requests = {
+          cpu    = "200m"
+          memory = "256Mi"
+        }
+      }
+    }
+    qa = {
+      namespace = "platform-qa"
+      domain    = "qa.127.0.0.1.nip.io"
+      replicas  = 2
+      resources = {
+        limits = {
+          cpu    = "1000m"
+          memory = "1Gi"
+        }
+        requests = {
+          cpu    = "200m"
+          memory = "256Mi"
+        }
+      }
+    }
+    prod = {
+      namespace = "platform-prod"
+      domain    = "prod.127.0.0.1.nip.io"
+      replicas  = 3
+      resources = {
+        limits = {
+          cpu    = "2000m"
+          memory = "2Gi"
+        }
+        requests = {
+          cpu    = "500m"
+          memory = "512Mi"
+        }
+      }
+    }
+  }
+}

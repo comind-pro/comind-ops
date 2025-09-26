@@ -11,7 +11,7 @@ metadata:
 spec:
   project: comind-ops-platform
   source:
-    repoURL: file:///tmp/comind-ops.git
+    repoURL: https://github.com/comind-pro/comind-ops  # Will be overridden by ArgoCD config
     targetRevision: main
     path: k8s/kustomize
     directory:

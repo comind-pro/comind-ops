@@ -8,7 +8,6 @@ This directory contains all infrastructure-related components for the Comind-Ops
 infra/
 ├── docker/                    # External services (PostgreSQL, MinIO)
 │   ├── docker-compose.yml     # Docker Compose configuration
-│   ├── env.template           # Environment variables template
 │   ├── postgres/              # PostgreSQL configuration
 │   │   ├── init/              # Database initialization scripts
 │   │   └── config/            # PostgreSQL configuration files

@@ -18,7 +18,6 @@ Complete documentation for the Comind-Ops Platform covering architecture, operat
 infra/
 ├── docker/                    # External services (PostgreSQL, MinIO)
 │   ├── docker-compose.yml     # Service orchestration
-│   ├── env.template           # Configuration template
 │   ├── postgres/              # Database setup and config
 │   └── scripts/               # Backup automation
 └── terraform/                 # Infrastructure as Code

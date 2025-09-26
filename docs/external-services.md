@@ -119,14 +119,17 @@ make services-backup
 
 ### Environment Variables
 
-Copy the environment template and customize:
+Environment configuration is now managed from the root `.env` file:
 
 ```bash
-# Copy template
-cp infra/docker/env.template infra/docker/.env
+# Setup environment configuration
+make setup-env
 
 # Edit configuration
-nano infra/docker/.env
+nano .env
+
+# Validate configuration
+make validate-env
 ```
 
 **Key settings:**

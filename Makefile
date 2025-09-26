@@ -8,6 +8,14 @@ COMMAND ?= plan
 TEAM ?= platform
 PROFILE ?= local
 
+# Load environment configuration if .env exists
+ifneq (,$(wildcard .env))
+    include .env
+    export
+    # Load environment variables for Terraform
+    $(shell scripts/load-env.sh)
+endif
+
 # Colors for output
 BLUE := \033[0;34m
 GREEN := \033[0;32m
@@ -23,6 +31,7 @@ help: ## Show this help message
 	@echo "$(BLUE)Comind-Ops Platform - Available Commands$(NC)"
 	@echo ""
 	@echo "$(GREEN)🚀 Quick Start:$(NC)"
+	@echo "  make setup-env                    # Setup environment configuration"
 	@echo "  make bootstrap                    # Complete infrastructure setup (Terraform + ArgoCD)"
 	@echo "  make services-setup               # Start external services (PostgreSQL, MinIO)"
 	@echo "  make argo-login                   # Get ArgoCD admin credentials"
@@ -56,37 +65,45 @@ help: ## Show this help message
 .PHONY: bootstrap
 bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Services)
 	@echo "$(BLUE)🏗️  Bootstrapping Comind-Ops Platform...$(NC)"
-	@echo "$(YELLOW)Phase 1: Terraform Infrastructure Setup$(NC)"
-	@echo "$(YELLOW)Step 1/9: Checking dependencies...$(NC)"
+	@echo "$(YELLOW)Phase 1: Environment Validation$(NC)"
+	@echo "$(YELLOW)Step 1/10: Validating environment configuration...$(NC)"
+	@if [ -f .env ]; then \
+		./scripts/setup-env.sh validate; \
+	else \
+		echo "$(RED)❌ .env file not found. Run 'make setup-env' first$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(YELLOW)Phase 2: Terraform Infrastructure Setup$(NC)"
+	@echo "$(YELLOW)Step 2/10: Checking dependencies...$(NC)"
 	@./scripts/check-deps.sh
-	@echo "$(YELLOW)Step 2/9: Starting external services (local only)...$(NC)"
+	@echo "$(YELLOW)Step 3/10: Starting external services (local only)...$(NC)"
 	@if [ "$(PROFILE)" = "local" ]; then \
 		$(MAKE) --no-print-directory services-setup; \
 	else \
 		echo "$(BLUE)Skipping Docker services for $(PROFILE) profile - using cloud services$(NC)"; \
 	fi
-	@echo "$(YELLOW)Step 3/9: Initializing Terraform...$(NC)"
+	@echo "$(YELLOW)Step 4/10: Initializing Terraform...$(NC)"
 	@terraform -chdir=infra/terraform/environments/$(PROFILE) init
-	@echo "$(YELLOW)Step 4/9: Deploying core infrastructure...$(NC)"
+	@echo "$(YELLOW)Step 5/10: Deploying core infrastructure...$(NC)"
 	@./infra/terraform/scripts/tf.sh $(ENV) core apply --auto-approve --profile $(PROFILE)
-	@echo "$(YELLOW)Step 5/9: Waiting for cluster to be ready...$(NC)"
+	@echo "$(YELLOW)Step 6/10: Waiting for cluster to be ready...$(NC)"
 	@sleep 30
 	@kubectl wait --for=condition=available --timeout=300s deployment/argocd-server -n argocd || echo "ArgoCD still starting..."
-	@echo "$(YELLOW)Step 6/9: Applying base Kubernetes resources...$(NC)"
+	@echo "$(YELLOW)Step 7/10: Applying base Kubernetes resources...$(NC)"
 	@kubectl apply -k k8s/base/
-	@echo "$(YELLOW)Step 7/9: Deploying platform services...$(NC)"
+	@echo "$(YELLOW)Step 8/10: Deploying platform services...$(NC)"
 	@kubectl apply -k k8s/platform/
-	@echo "$(YELLOW)Step 7.1/9: Deploying Redis service...$(NC)"
+	@echo "$(YELLOW)Step 8.1/10: Deploying Redis service...$(NC)"
 	@helm upgrade --install redis-dev k8s/charts/platform/redis -n platform-dev --create-namespace -f k8s/charts/platform/redis/values/dev.yaml
-	@echo "$(YELLOW)Step 7.2/9: Deploying PostgreSQL service...$(NC)"
+	@echo "$(YELLOW)Step 8.2/10: Deploying PostgreSQL service...$(NC)"
 	@helm upgrade --install postgresql-dev k8s/charts/platform/postgresql -n platform-dev --create-namespace -f k8s/charts/platform/postgresql/values/dev.yaml
-	@echo "$(YELLOW)Step 7.3/9: Deploying MinIO service...$(NC)"
+	@echo "$(YELLOW)Step 8.3/10: Deploying MinIO service...$(NC)"
 	@helm upgrade --install minio-dev k8s/charts/platform/minio -n platform-dev --create-namespace -f k8s/charts/platform/minio/values/dev.yaml
-	@echo "$(YELLOW)Phase 2: ArgoCD GitOps Setup$(NC)"
-	@echo "$(YELLOW)Step 8/9: Setting up GitOps with ArgoCD...$(NC)"
+	@echo "$(YELLOW)Phase 3: ArgoCD GitOps Setup$(NC)"
+	@echo "$(YELLOW)Step 9/10: Setting up GitOps with ArgoCD...$(NC)"
 	@kubectl apply -f k8s/kustomize/root-app.yaml
-	@echo "$(YELLOW)Phase 3: Monitoring and Access$(NC)"
-	@echo "$(YELLOW)Step 9/9: Deploying monitoring dashboard...$(NC)"
+	@echo "$(YELLOW)Phase 4: Monitoring and Access$(NC)"
+	@echo "$(YELLOW)Step 10/10: Deploying monitoring dashboard...$(NC)"
 	@./scripts/deploy-monitoring.sh
 	@echo "$(GREEN)✅ Bootstrap complete!$(NC)"
 	@echo ""
@@ -97,6 +114,21 @@ bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Servi
 	@echo "  ✅ Monitoring: Dashboard and access setup"
 	@echo ""
 	@$(MAKE) --no-print-directory status
+
+setup-env: ## Setup environment configuration
+	@echo "$(BLUE)🔧 Setting up environment configuration...$(NC)"
+	@./scripts/setup-env.sh init
+	@echo "$(GREEN)✅ Environment configuration created$(NC)"
+	@echo "$(YELLOW)📝 Please edit .env file and run 'make validate-env' to verify$(NC)"
+
+validate-env: ## Validate environment configuration
+	@echo "$(BLUE)🔍 Validating environment configuration...$(NC)"
+	@./scripts/setup-env.sh validate
+	@echo "$(GREEN)✅ Environment configuration is valid$(NC)"
+
+show-env: ## Show current environment configuration
+	@echo "$(BLUE)📋 Current environment configuration:$(NC)"
+	@./scripts/setup-env.sh show
 
 check-deps: ## Check if all required dependencies are installed
 	@echo "$(BLUE)🔍 Checking platform dependencies...$(NC)"

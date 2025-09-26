@@ -10,11 +10,13 @@ configs:
   cm:
     url: https://${domain}
     application.instanceLabelKey: argocd.argoproj.io/instance
-    # repositories: |
-    #   - url: https://github.com/comind-pro/comind-ops
-    #     name: comind-ops
-    #     type: git
-    #     insecure: true
+    # Repository configuration (supports both private and public)
+    repositories: |
+      - url: ${repo_url}
+        name: ${repo_name}
+        type: git
+        insecure: false
+        # Repository credentials will be provided via secret for private repos
 
 server:
   ingress:
@@ -52,3 +54,20 @@ dex:
 
 redis:
   enabled: true
+
+# Repository server configuration (supports both private and public repos)
+repoServer:
+  service:
+    type: ClusterIP
+  # Mount SSH keys for private repository access (conditional)
+  volumes: ${repo_server_volumes}
+  volumeMounts: ${repo_server_volume_mounts}
+
+# Controller configuration
+controller:
+  service:
+    type: ClusterIP
+  # Repository server configuration
+  env:
+    - name: ARGOCD_REPO_SERVER
+      value: argocd-repo-server:8081

@@ -54,3 +54,48 @@ variable "vpc_cidr" {
   type        = string
   default     = "10.0.0.0/16"
 }
+
+variable "tags" {
+  description = "A map of tags to assign to the resource"
+  type        = map(string)
+  default     = {}
+}
+
+# Repository configuration
+variable "repo_url" {
+  description = "Repository URL (supports both private and public)"
+  type        = string
+  default     = "https://github.com/comind-pro/comind-ops"
+}
+
+variable "repo_type" {
+  description = "Repository type: 'public' or 'private'"
+  type        = string
+  default     = "public"
+  validation {
+    condition     = contains(["public", "private"], var.repo_type)
+    error_message = "Repository type must be 'public' or 'private'."
+  }
+}
+
+# GitHub credentials for private repository access
+variable "github_username" {
+  description = "GitHub username for private repository access"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_token" {
+  description = "GitHub personal access token for private repository access"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_ssh_private_key" {
+  description = "GitHub SSH private key for repository access"
+  type        = string
+  default     = ""
+  sensitive   = true
+}

@@ -63,17 +63,36 @@ check_dependencies() {
 
 ensure_env_file() {
     local env_file="$DOCKER_DIR/.env"
+    local root_env_file="$PROJECT_ROOT/.env"
     
     if [[ ! -f "$env_file" ]]; then
-        log "Creating .env file from template..."
-        cp "$DOCKER_DIR/env.template" "$env_file"
-        warning "Please customize the values in $env_file before starting services"
-        
-        # Set environment-specific defaults
-        if [[ "$ENV" != "dev" ]]; then
-            log "Updating environment to $ENV in .env file..."
-            sed -i.bak "s/ENV=dev/ENV=$ENV/" "$env_file"
-            rm -f "$env_file.bak"
+        if [[ -f "$root_env_file" ]]; then
+            log "Creating Docker .env file from root .env configuration..."
+            # Extract Docker-specific variables from root .env
+            cat > "$env_file" << EOF
+# Docker Compose Environment Variables
+# Generated from root .env file
+
+# PostgreSQL Configuration
+POSTGRES_DB=${POSTGRES_DATABASE:-comind_ops}
+POSTGRES_USER=${POSTGRES_USERNAME:-comind_ops}
+POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-comind_ops_password}
+
+# MinIO Configuration
+MINIO_ROOT_USER=${MINIO_ACCESS_KEY:-minioadmin}
+MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:-minioadmin}
+
+# Redis Configuration
+REDIS_PASSWORD=${REDIS_PASSWORD:-}
+
+# Environment
+ENV=${ENVIRONMENT:-dev}
+EOF
+            success "Created Docker .env file from root configuration"
+        else
+            error "Root .env file not found at $root_env_file"
+            error "Please run 'make setup-env' to create environment configuration"
+            exit 1
         fi
     fi
 }

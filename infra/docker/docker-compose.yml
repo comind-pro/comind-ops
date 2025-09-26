@@ -1,5 +1,6 @@
 # Docker Compose file for Comind-Ops Platform External Services
 # Production-ready configuration with backup automation and proper initialization
+# Environment variables are loaded from root .env file via external-services.sh
 
 networks:
   comind-ops-network:
@@ -29,8 +30,8 @@ services:
     container_name: comind-ops-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: comind_ops_dev
-      POSTGRES_USER: comind_ops_user
+      POSTGRES_DB: ${POSTGRES_DB:-comind_ops}
+      POSTGRES_USER: ${POSTGRES_USER:-comind_ops}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-comind_ops_password}
       POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
       PGDATA: /var/lib/postgresql/data/pgdata
@@ -43,7 +44,7 @@ services:
       comind-ops-network:
         ipv4_address: 172.20.0.10
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U comind_ops_user -d comind_ops_dev"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-comind_ops} -d ${POSTGRES_DB:-comind_ops}"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -66,8 +67,8 @@ services:
     container_name: comind-ops-minio
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-comind_ops_minio_admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-comind_ops_minio_password}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
       MINIO_BROWSER_REDIRECT_URL: http://localhost:9001
       MINIO_SERVER_URL: http://localhost:9000
       MINIO_CONSOLE_ADDRESS: ":9001"
@@ -107,8 +108,8 @@ services:
       minio:
         condition: service_healthy
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-comind_ops_minio_admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-comind_ops_minio_password}
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
     networks:
       - comind-ops-network
     labels:
