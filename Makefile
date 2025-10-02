@@ -38,6 +38,12 @@ help: ## Show this help message
 	@echo "  make new-app-full APP=my-api      # Create application with infrastructure"
 	@echo "  make gitops-status                # Check ArgoCD GitOps status"
 	@echo "  make monitoring-access            # Access monitoring dashboard"
+	@echo "  make port-forward-all             # Start port-forward for ingress and services"
+	@echo "  make port-forward-stop            # Stop all port-forwarding"
+	@echo "  make port-forward-status          # Show port-forward status"
+	@echo "  make expose-cloud-start           # Expose ingress via Cloudflare Tunnel"
+	@echo "  make expose-cloud-stop            # Stop Cloudflare exposure"
+	@echo "  make expose-cloud-status          # Show Cloudflare exposure status"
 	@echo ""
 	@echo "$(GREEN)📋 Available Commands:$(NC)"
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(YELLOW)%-25s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -113,15 +119,27 @@ bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Servi
 		echo "$(BLUE)Deploying services for environments: $(ENV)$(NC)"; \
 		for env in $(shell echo "$(ENV)" | tr ',' ' '); do \
 			echo "$(YELLOW)Deploying services for $$env environment...$(NC)"; \
-			helm upgrade --install redis-$$env k8s/charts/platform/redis -n platform-$$env --create-namespace -f k8s/charts/platform/redis/values/$$env.yaml; \
-			helm upgrade --install postgresql-$$env k8s/charts/platform/postgresql -n platform-$$env --create-namespace -f k8s/charts/platform/postgresql/values/$$env.yaml; \
-			helm upgrade --install minio-$$env k8s/charts/platform/minio -n platform-$$env --create-namespace -f k8s/charts/platform/minio/values/$$env.yaml; \
+			if [ "$(PROFILE)" = "local" ]; then \
+				helm upgrade --install redis-$$env k8s/charts/platform/redis -n platform-$$env --create-namespace -f k8s/charts/platform/redis/values/$$env.yaml -f k8s/charts/platform/redis/values/local.yaml --wait --timeout=10m; \
+				helm upgrade --install postgresql-$$env k8s/charts/platform/postgresql -n platform-$$env --create-namespace -f k8s/charts/platform/postgresql/values/$$env.yaml -f k8s/charts/platform/postgresql/values/local.yaml --wait --timeout=10m; \
+				helm upgrade --install minio-$$env k8s/charts/platform/minio -n platform-$$env --create-namespace -f k8s/charts/platform/minio/values/$$env.yaml -f k8s/charts/platform/minio/values/local.yaml --wait --timeout=10m; \
+			else \
+ 			helm upgrade --install redis-$$env k8s/charts/platform/redis -n platform-$$env --create-namespace -f k8s/charts/platform/redis/values/$$env.yaml --wait --timeout=10m; \
+ 			helm upgrade --install postgresql-$$env k8s/charts/platform/postgresql -n platform-$$env --create-namespace -f k8s/charts/platform/postgresql/values/$$env.yaml --wait --timeout=10m; \
+ 			helm upgrade --install minio-$$env k8s/charts/platform/minio -n platform-$$env --create-namespace -f k8s/charts/platform/minio/values/$$env.yaml --wait --timeout=10m; \
+			fi; \
 		done; \
 	else \
 		echo "$(BLUE)Deploying services for $(ENV) environment...$(NC)"; \
-		helm upgrade --install redis-$(ENV) k8s/charts/platform/redis -n platform-$(ENV) --create-namespace -f k8s/charts/platform/redis/values/$(ENV).yaml; \
-		helm upgrade --install postgresql-$(ENV) k8s/charts/platform/postgresql -n platform-$(ENV) --create-namespace -f k8s/charts/platform/postgresql/values/$(ENV).yaml; \
-		helm upgrade --install minio-$(ENV) k8s/charts/platform/minio -n platform-$(ENV) --create-namespace -f k8s/charts/platform/minio/values/$(ENV).yaml; \
+		if [ "$(PROFILE)" = "local" ]; then \
+			helm upgrade --install redis-$(ENV) k8s/charts/platform/redis -n platform-$(ENV) --create-namespace -f k8s/charts/platform/redis/values/$(ENV).yaml -f k8s/charts/platform/redis/values/local.yaml --wait --timeout=10m; \
+			helm upgrade --install postgresql-$(ENV) k8s/charts/platform/postgresql -n platform-$(ENV) --create-namespace -f k8s/charts/platform/postgresql/values/$(ENV).yaml -f k8s/charts/platform/postgresql/values/local.yaml --wait --timeout=10m; \
+			helm upgrade --install minio-$(ENV) k8s/charts/platform/minio -n platform-$(ENV) --create-namespace -f k8s/charts/platform/minio/values/$(ENV).yaml -f k8s/charts/platform/minio/values/local.yaml --wait --timeout=10m; \
+		else \
+			helm upgrade --install redis-$(ENV) k8s/charts/platform/redis -n platform-$(ENV) --create-namespace -f k8s/charts/platform/redis/values/$(ENV).yaml --wait --timeout=10m; \
+			helm upgrade --install postgresql-$(ENV) k8s/charts/platform/postgresql -n platform-$(ENV) --create-namespace -f k8s/charts/platform/postgresql/values/$(ENV).yaml --wait --timeout=10m; \
+			helm upgrade --install minio-$(ENV) k8s/charts/platform/minio -n platform-$(ENV) --create-namespace -f k8s/charts/platform/minio/values/$(ENV).yaml --wait --timeout=10m; \
+		fi; \
 	fi
 	@echo "$(YELLOW)Phase 3: ArgoCD GitOps Setup$(NC)"
 	@echo "$(YELLOW)Step 9/10: Setting up GitOps with ArgoCD...$(NC)"
@@ -235,7 +253,7 @@ argo-login: ## Get ArgoCD admin credentials and access information
 	@kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d && echo "" || echo "Not available (check if ArgoCD is running)"
 	@echo ""
 	@echo "$(GREEN)Port Forward (if needed):$(NC)"
-	@echo "kubectl port-forward service/argocd-server -n argocd 8080:80"
+	@echo "make port-forward-all ENV=$(ENV)"
 
 .PHONY: argo-apps
 argo-apps: ## List all ArgoCD applications
@@ -464,6 +482,25 @@ status: ## Show overall platform status
 	@echo "• Registry: http://registry.$(ENV).127.0.0.1.nip.io:8080"
 
 # ===========================================
+# 🔗 PORT FORWARDING
+# ===========================================
+
+.PHONY: port-forward-all
+port-forward-all: ## Start port forwarding for ingress and core services (ENV=dev)
+	@echo "$(BLUE)🔗 Starting port-forwarding for $(ENV)...$(NC)"
+	@ENV=$(ENV) scripts/port-forward.sh start $(ENV)
+	@echo "$(GREEN)✅ Port-forwarding started$(NC)"
+
+.PHONY: port-forward-stop
+port-forward-stop: ## Stop all port-forwarding processes
+	@echo "$(BLUE)🛑 Stopping port-forwarding...$(NC)"
+	@scripts/port-forward.sh stop
+	@echo "$(GREEN)✅ Port-forwarding stopped$(NC)"
+
+.PHONY: port-forward-status
+port-forward-status: ## Show port-forwarding status
+	@scripts/port-forward.sh status
+# ===========================================
 # ✅ VALIDATION & TESTING
 # ===========================================
 
@@ -609,3 +646,23 @@ clean-env: ## Complete environment cleanup (terraform, docker, k3d) - DESTRUCTIV
 
 .PHONY: clean-all
 clean-all: clean-env ## Alias for clean-env
+
+# ===========================================
+# 🌐 CLOUD EXPOSURE (Cloudflare Tunnel)
+# ===========================================
+
+.PHONY: expose-cloud-start
+expose-cloud-start: ## Start Cloudflare Tunnel (CF_TUNNEL_TOKEN or CF_HOSTNAME required)
+	@echo "$(BLUE)🌐 Starting Cloudflare Tunnel for $(ENV)...$(NC)"
+	@ENV=$(ENV) scripts/expose-cloud.sh start $(ENV)
+	@echo "$(GREEN)✅ Cloud exposure started$(NC)"
+
+.PHONY: expose-cloud-stop
+expose-cloud-stop: ## Stop Cloudflare Tunnel
+	@echo "$(BLUE)🛑 Stopping Cloudflare Tunnel...$(NC)"
+	@scripts/expose-cloud.sh stop
+	@echo "$(GREEN)✅ Cloud exposure stopped$(NC)"
+
+.PHONY: expose-cloud-status
+expose-cloud-status: ## Show Cloudflare Tunnel status
+	@scripts/expose-cloud.sh status

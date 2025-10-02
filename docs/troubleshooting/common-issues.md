@@ -300,13 +300,15 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 kubectl -n argocd patch secret argocd-secret -p '{"stringData": {"admin.password": "$2a$10$rRyBsGSHK6.uc8fntPwVFOBGpG3idAHag4YXP2snp2I0TjXfYyJwe", "admin.passwordMtime": "'$(date +%Y-%m-%dT%H:%M:%S)'"}}'
 ```
 
-**Solution 3: Check Port Forwarding**
+**Solution 3: Access ArgoCD**
 ```bash
-# Check if port forwarding is working
-kubectl port-forward svc/argocd-server -n argocd 8080:443
+# Get ArgoCD access credentials and setup
+make argo-login
 
-# Access ArgoCD UI
-open https://localhost:8080
+# This will display:
+# - ArgoCD Web UI URL
+# - Admin credentials
+# - Port forwarding command (if needed)
 ```
 
 ## Helm Issues
@@ -560,14 +562,13 @@ kubectl describe pod <pod-name> -n <namespace> | grep -A 5 "Limits:"
 
 **Solution 2: Check Application Metrics**
 ```bash
-# Check application metrics
-kubectl port-forward svc/prometheus -n monitoring 9090:9090
+# Access monitoring dashboard
+make monitoring-access
 
-# Access Prometheus
-open http://localhost:9090
-
-# Check Grafana dashboards
-kubectl port-forward svc/grafana -n monitoring 3000:3000
+# This will set up access to:
+# - Prometheus: http://localhost:9090
+# - Grafana: http://localhost:3000
+# - Monitoring Dashboard: http://localhost:8081
 ```
 
 **Solution 3: Scale Application**
@@ -770,14 +771,12 @@ kubectl get hpa -n <namespace>
 
 **Solution 1: Check Application Metrics**
 ```bash
-# Check application metrics
-kubectl port-forward svc/prometheus -n monitoring 9090:9090
+# Access monitoring dashboard
+make monitoring-access
 
-# Access Prometheus
-open http://localhost:9090
-
-# Check specific metrics
+# Check specific metrics (after monitoring is accessible)
 curl "http://localhost:9090/api/v1/query?query=up"
+curl "http://localhost:9090/api/v1/query?query=rate(http_requests_total[5m])"
 ```
 
 **Solution 2: Check Database Performance**

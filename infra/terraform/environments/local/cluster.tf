@@ -4,7 +4,8 @@
 
 # K3d cluster creation using Docker provider
 resource "docker_network" "k3d_network" {
-  count = var.cluster_type == "local" ? 1 : 0
+  # Create the Docker network only once for the local profile (dev workspace)
+  count = var.cluster_type == "local" && terraform.workspace == "dev" ? 1 : 0
   name  = "k3d-comind-ops-network"
 
   ipam_config {
@@ -40,7 +41,9 @@ resource "null_resource" "k3d_cluster" {
     command = "k3d cluster delete ${self.triggers.cluster_name} || true"
   }
 
-  depends_on = [docker_network.k3d_network]
+  # If the network was created in dev workspace, prod will still use it implicitly
+  # Avoid hard dependency to allow prod workspace to proceed without re-creating network
+  # depends_on = [docker_network.k3d_network]
 }
 
 # Set kubeconfig context

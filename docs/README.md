@@ -29,14 +29,11 @@ make status
 
 ### 2. Create Your First Application
 ```bash
-# Create new application
-make new-app APP=hello-world TEAM=platform
+# Create new application with infrastructure
+make new-app-full APP=hello-world TEAM=platform
 
-# Deploy application
-make tf-apply-app APP=hello-world
-
-# Check deployment
-kubectl get pods -n hello-world-dev
+# Check GitOps status
+make gitops-status
 ```
 
 ### 3. Access Platform Services

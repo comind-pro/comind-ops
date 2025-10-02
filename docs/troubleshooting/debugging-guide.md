@@ -129,14 +129,16 @@ kubectl debug node/<node-name> -it --image=busybox
 
 #### Port Forwarding
 ```bash
-# Forward service port
-kubectl port-forward svc/<service-name> -n <namespace> 8080:80
+# Use platform port-forwarding commands
+make port-forward-all ENV=dev        # Start port forwarding for ingress and services
+make port-forward-status             # Show port-forward status
+make port-forward-stop               # Stop all port-forwarding
 
-# Forward pod port
-kubectl port-forward pod/<pod-name> -n <namespace> 8080:80
+# Monitoring dashboard access
+make monitoring-port-forward         # Set up port forwarding for monitoring
 
-# Forward deployment port
-kubectl port-forward deployment/<deployment-name> -n <namespace> 8080:80
+# For manual port forwarding (if needed for debugging)
+# kubectl port-forward svc/<service-name> -n <namespace> 8080:80
 ```
 
 ### 2. Log Analysis Tools
@@ -205,15 +207,15 @@ kubectl describe resourcequota <quota-name> -n <namespace>
 
 #### Performance Metrics
 ```bash
-# Access Prometheus
-kubectl port-forward svc/prometheus -n monitoring 9090:9090
+# Access monitoring dashboard
+make monitoring-access               # Set up monitoring dashboard access
 
-# Query metrics
+# Or use port forwarding for all services
+make port-forward-all ENV=dev        # Start port forwarding for ingress and services
+
+# Query metrics (after port forwarding is set up)
 curl "http://localhost:9090/api/v1/query?query=up"
 curl "http://localhost:9090/api/v1/query?query=rate(container_cpu_usage_seconds_total[5m])"
-
-# Access Grafana
-kubectl port-forward svc/grafana -n monitoring 3000:3000
 ```
 
 #### Profiling
@@ -572,10 +574,10 @@ kubectl exec <pod-name> -n <namespace> -- df -h
 
 #### Storage Metrics
 ```bash
-# Check storage metrics
-kubectl port-forward svc/prometheus -n monitoring 9090:9090
+# Access monitoring dashboard
+make monitoring-access               # Set up monitoring dashboard access
 
-# Query storage metrics
+# Query storage metrics (after monitoring is accessible)
 curl "http://localhost:9090/api/v1/query?query=kubelet_volume_stats_used_bytes"
 curl "http://localhost:9090/api/v1/query?query=kubelet_volume_stats_available_bytes"
 ```
@@ -672,10 +674,10 @@ kubectl exec <pod-name> -n <namespace> -- env | grep -E "(APP_|DB_|API_)"
 
 #### Performance Metrics
 ```bash
-# Check application metrics
-kubectl port-forward svc/prometheus -n monitoring 9090:9090
+# Access monitoring dashboard
+make monitoring-access               # Set up monitoring dashboard access
 
-# Query application metrics
+# Query application metrics (after monitoring is accessible)
 curl "http://localhost:9090/api/v1/query?query=up{job=\"<app-name>\"}"
 curl "http://localhost:9090/api/v1/query?query=rate(http_requests_total[5m])"
 
@@ -900,9 +902,8 @@ set -euo pipefail
 
 echo "Starting monitoring debug..."
 
-# Check Prometheus
-kubectl port-forward svc/prometheus -n monitoring 9090:9090 &
-PROMETHEUS_PID=$!
+# Set up monitoring access
+make monitoring-access
 
 # Wait for port forward
 sleep 5
@@ -910,9 +911,6 @@ sleep 5
 # Query metrics
 echo "=== Metrics ==="
 curl -s "http://localhost:9090/api/v1/query?query=up" | jq '.data.result[]'
-
-# Cleanup
-kill $PROMETHEUS_PID
 
 echo "Monitoring debug complete."
 EOF
