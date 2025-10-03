@@ -120,25 +120,25 @@ bootstrap: ## Complete infrastructure setup (Terraform + ArgoCD + Platform Servi
 		for env in $(shell echo "$(ENV)" | tr ',' ' '); do \
 			echo "$(YELLOW)Deploying services for $$env environment...$(NC)"; \
 			if [ "$(PROFILE)" = "local" ]; then \
-				helm upgrade --install redis-$$env k8s/charts/platform/redis -n platform-$$env --create-namespace -f k8s/charts/platform/redis/values/$$env.yaml -f k8s/charts/platform/redis/values/local.yaml --wait --timeout=10m; \
-				helm upgrade --install postgresql-$$env k8s/charts/platform/postgresql -n platform-$$env --create-namespace -f k8s/charts/platform/postgresql/values/$$env.yaml -f k8s/charts/platform/postgresql/values/local.yaml --wait --timeout=10m; \
-				helm upgrade --install minio-$$env k8s/charts/platform/minio -n platform-$$env --create-namespace -f k8s/charts/platform/minio/values/$$env.yaml -f k8s/charts/platform/minio/values/local.yaml --wait --timeout=10m; \
+				( for i in 1 2 3; do helm upgrade --install redis-$$env k8s/charts/platform/redis -n platform-$$env --create-namespace -f k8s/charts/platform/redis/values/$$env.yaml -f k8s/charts/platform/redis/values/local.yaml --wait --timeout=15m --atomic && break || { echo "Retrying redis-$$env ($$i/3)"; sleep 10; }; done ); \
+				( for i in 1 2 3; do helm upgrade --install postgresql-$$env k8s/charts/platform/postgresql -n platform-$$env --create-namespace -f k8s/charts/platform/postgresql/values/$$env.yaml -f k8s/charts/platform/postgresql/values/local.yaml --wait --timeout=15m --atomic && break || { echo "Retrying postgresql-$$env ($$i/3)"; sleep 10; }; done ); \
+				( for i in 1 2 3; do helm upgrade --install minio-$$env k8s/charts/platform/minio -n platform-$$env --create-namespace -f k8s/charts/platform/minio/values/$$env.yaml -f k8s/charts/platform/minio/values/local.yaml --wait --timeout=15m --atomic && break || { echo "Retrying minio-$$env ($$i/3)"; sleep 10; }; done ); \
 			else \
- 			helm upgrade --install redis-$$env k8s/charts/platform/redis -n platform-$$env --create-namespace -f k8s/charts/platform/redis/values/$$env.yaml --wait --timeout=10m; \
- 			helm upgrade --install postgresql-$$env k8s/charts/platform/postgresql -n platform-$$env --create-namespace -f k8s/charts/platform/postgresql/values/$$env.yaml --wait --timeout=10m; \
- 			helm upgrade --install minio-$$env k8s/charts/platform/minio -n platform-$$env --create-namespace -f k8s/charts/platform/minio/values/$$env.yaml --wait --timeout=10m; \
+		 		( for i in 1 2 3; do helm upgrade --install redis-$$env k8s/charts/platform/redis -n platform-$$env --create-namespace -f k8s/charts/platform/redis/values/$$env.yaml --wait --timeout=15m --atomic && break || { echo "Retrying redis-$$env ($$i/3)"; sleep 10; }; done ); \
+		 		( for i in 1 2 3; do helm upgrade --install postgresql-$$env k8s/charts/platform/postgresql -n platform-$$env --create-namespace -f k8s/charts/platform/postgresql/values/$$env.yaml --wait --timeout=15m --atomic && break || { echo "Retrying postgresql-$$env ($$i/3)"; sleep 10; }; done ); \
+		 		( for i in 1 2 3; do helm upgrade --install minio-$$env k8s/charts/platform/minio -n platform-$$env --create-namespace -f k8s/charts/platform/minio/values/$$env.yaml --wait --timeout=15m --atomic && break || { echo "Retrying minio-$$env ($$i/3)"; sleep 10; }; done ); \
 			fi; \
 		done; \
 	else \
 		echo "$(BLUE)Deploying services for $(ENV) environment...$(NC)"; \
 		if [ "$(PROFILE)" = "local" ]; then \
-			helm upgrade --install redis-$(ENV) k8s/charts/platform/redis -n platform-$(ENV) --create-namespace -f k8s/charts/platform/redis/values/$(ENV).yaml -f k8s/charts/platform/redis/values/local.yaml --wait --timeout=10m; \
-			helm upgrade --install postgresql-$(ENV) k8s/charts/platform/postgresql -n platform-$(ENV) --create-namespace -f k8s/charts/platform/postgresql/values/$(ENV).yaml -f k8s/charts/platform/postgresql/values/local.yaml --wait --timeout=10m; \
-			helm upgrade --install minio-$(ENV) k8s/charts/platform/minio -n platform-$(ENV) --create-namespace -f k8s/charts/platform/minio/values/$(ENV).yaml -f k8s/charts/platform/minio/values/local.yaml --wait --timeout=10m; \
+			( for i in 1 2 3; do helm upgrade --install redis-$(ENV) k8s/charts/platform/redis -n platform-$(ENV) --create-namespace -f k8s/charts/platform/redis/values/$(ENV).yaml -f k8s/charts/platform/redis/values/local.yaml --wait --timeout=15m --atomic && break || { echo "Retrying redis-$(ENV) ($$i/3)"; sleep 10; }; done ); \
+			( for i in 1 2 3; do helm upgrade --install postgresql-$(ENV) k8s/charts/platform/postgresql -n platform-$(ENV) --create-namespace -f k8s/charts/platform/postgresql/values/$(ENV).yaml -f k8s/charts/platform/postgresql/values/local.yaml --wait --timeout=15m --atomic && break || { echo "Retrying postgresql-$(ENV) ($$i/3)"; sleep 10; }; done ); \
+			( for i in 1 2 3; do helm upgrade --install minio-$(ENV) k8s/charts/platform/minio -n platform-$(ENV) --create-namespace -f k8s/charts/platform/minio/values/$(ENV).yaml -f k8s/charts/platform/minio/values/local.yaml --wait --timeout=15m --atomic && break || { echo "Retrying minio-$(ENV) ($$i/3)"; sleep 10; }; done ); \
 		else \
-			helm upgrade --install redis-$(ENV) k8s/charts/platform/redis -n platform-$(ENV) --create-namespace -f k8s/charts/platform/redis/values/$(ENV).yaml --wait --timeout=10m; \
-			helm upgrade --install postgresql-$(ENV) k8s/charts/platform/postgresql -n platform-$(ENV) --create-namespace -f k8s/charts/platform/postgresql/values/$(ENV).yaml --wait --timeout=10m; \
-			helm upgrade --install minio-$(ENV) k8s/charts/platform/minio -n platform-$(ENV) --create-namespace -f k8s/charts/platform/minio/values/$(ENV).yaml --wait --timeout=10m; \
+			( for i in 1 2 3; do helm upgrade --install redis-$(ENV) k8s/charts/platform/redis -n platform-$(ENV) --create-namespace -f k8s/charts/platform/redis/values/$(ENV).yaml --wait --timeout=15m --atomic && break || { echo "Retrying redis-$(ENV) ($$i/3)"; sleep 10; }; done ); \
+			( for i in 1 2 3; do helm upgrade --install postgresql-$(ENV) k8s/charts/platform/postgresql -n platform-$(ENV) --create-namespace -f k8s/charts/platform/postgresql/values/$(ENV).yaml --wait --timeout=15m --atomic && break || { echo "Retrying postgresql-$(ENV) ($$i/3)"; sleep 10; }; done ); \
+			( for i in 1 2 3; do helm upgrade --install minio-$(ENV) k8s/charts/platform/minio -n platform-$(ENV) --create-namespace -f k8s/charts/platform/minio/values/$(ENV).yaml --wait --timeout=15m --atomic && break || { echo "Retrying minio-$(ENV) ($$i/3)"; sleep 10; }; done ); \
 		fi; \
 	fi
 	@echo "$(YELLOW)Phase 3: ArgoCD GitOps Setup$(NC)"

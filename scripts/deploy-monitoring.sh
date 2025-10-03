@@ -77,15 +77,26 @@ echo -e "${BLUE}🚀 Deploying Monitoring Dashboard...${NC}"
 # Deploy monitoring dashboard from charts if present
 if [ -d "k8s/charts/apps/monitoring-dashboard" ]; then
     echo -e "${YELLOW}🔧 Deploying monitoring dashboard from charts...${NC}"
-    helm upgrade --install monitoring-dashboard k8s/charts/apps/monitoring-dashboard \
-        -n monitoring-dashboard-dev \
-        --create-namespace \
-        -f k8s/charts/apps/monitoring-dashboard/values/dev.yaml \
-        --wait
+    # Retry Helm install/upgrade up to 3 times with longer timeout
+    set +e
+    for i in 1 2 3; do
+        helm upgrade --install monitoring-dashboard k8s/charts/apps/monitoring-dashboard \
+            -n monitoring-dashboard-dev \
+            --create-namespace \
+            -f k8s/charts/apps/monitoring-dashboard/values/dev.yaml \
+            --wait --timeout=10m --atomic && break
+        echo -e "${YELLOW}Retrying monitoring-dashboard install ($i/3)...${NC}"; sleep 10
+    done
+    set -e
 
-    # Wait for deployment to be ready
+    # Wait for deployment to be ready with retries
     echo -e "${YELLOW}⏳ Waiting for monitoring dashboard to be ready...${NC}"
-    kubectl wait --for=condition=available --timeout=300s deployment/monitoring-dashboard -n monitoring-dashboard-dev || true
+    for i in 1 2 3 4 5; do
+        if kubectl wait --for=condition=available --timeout=60s deployment/monitoring-dashboard -n monitoring-dashboard-dev; then
+            break
+        fi
+        echo -e "${YELLOW}…not ready yet, retry $i/5${NC}"; sleep 6
+    done
 else
     echo -e "${YELLOW}⚠️  Monitoring dashboard chart not found at k8s/charts/apps/monitoring-dashboard. Skipping deployment...${NC}"
 fi

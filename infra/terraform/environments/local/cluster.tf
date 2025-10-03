@@ -4,8 +4,9 @@
 
 # K3d cluster creation using Docker provider
 resource "docker_network" "k3d_network" {
-  # Create the Docker network only once for the local profile (dev workspace)
-  count = var.cluster_type == "local" && terraform.workspace == "dev" ? 1 : 0
+  # Local profile uses k3d's auto-managed network to avoid IP pool overlaps on Docker Desktop.
+  # Disable Terraform-managed Docker network for local.
+  count = 0
   name  = "k3d-comind-ops-network"
 
   ipam_config {
