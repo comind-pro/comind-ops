@@ -66,10 +66,10 @@ output "external_service_info" {
 # Additional outputs required by the main module
 output "endpoint" {
   description = "Database endpoint (alias for database_host)"
-  value       = var.cluster_type == "local" ? var.database_config.external_host : (
+  value = var.cluster_type == "local" ? var.database_config.external_host : (
     var.cluster_type == "aws" ? (
       length(aws_db_instance.postgresql) > 0 ? aws_db_instance.postgresql[0].endpoint : null
-    ) : (
+      ) : (
       length(digitalocean_database_cluster.postgresql) > 0 ? digitalocean_database_cluster.postgresql[0].host : null
     )
   )
@@ -77,10 +77,10 @@ output "endpoint" {
 
 output "port" {
   description = "Database port"
-  value       = var.cluster_type == "local" ? var.database_config.external_port : (
+  value = var.cluster_type == "local" ? var.database_config.external_port : (
     var.cluster_type == "aws" ? (
       length(aws_db_instance.postgresql) > 0 ? aws_db_instance.postgresql[0].port : null
-    ) : (
+      ) : (
       length(digitalocean_database_cluster.postgresql) > 0 ? digitalocean_database_cluster.postgresql[0].port : null
     )
   )
@@ -94,13 +94,13 @@ output "username" {
 
 output "connection_string" {
   description = "Database connection string"
-  value       = var.cluster_type == "local" ? (
+  value = var.cluster_type == "local" ? (
     "postgresql://${var.database_username}:${var.database_password}@${var.database_config.external_host}:${var.database_config.external_port}/${var.database_name}"
-  ) : (
+    ) : (
     var.cluster_type == "aws" ? (
       length(aws_db_instance.postgresql) > 0 ?
       "postgresql://${var.database_username}:${var.database_password}@${aws_db_instance.postgresql[0].endpoint}:${aws_db_instance.postgresql[0].port}/${var.database_name}" : null
-    ) : (
+      ) : (
       length(digitalocean_database_cluster.postgresql) > 0 ?
       "postgresql://${var.database_username}:${var.database_password}@${digitalocean_database_cluster.postgresql[0].host}:${digitalocean_database_cluster.postgresql[0].port}/${var.database_name}" : null
     )
@@ -110,10 +110,10 @@ output "connection_string" {
 
 output "readonly_endpoint" {
   description = "Read-only database endpoint"
-  value       = var.cluster_type == "local" ? var.database_config.external_host : (
+  value = var.cluster_type == "local" ? var.database_config.external_host : (
     var.cluster_type == "aws" ? (
       length(aws_db_instance.postgresql) > 0 ? aws_db_instance.postgresql[0].endpoint : null
-    ) : (
+      ) : (
       length(digitalocean_database_cluster.postgresql) > 0 ? digitalocean_database_cluster.postgresql[0].host : null
     )
   )
@@ -144,7 +144,7 @@ output "database_id" {
   value = var.cluster_type == "local" ? "${var.app_name}-${var.environment}-external" : (
     var.cluster_type == "aws" ? (
       length(aws_db_instance.postgresql) > 0 ? aws_db_instance.postgresql[0].id : null
-    ) : (
+      ) : (
       length(digitalocean_database_cluster.postgresql) > 0 ? digitalocean_database_cluster.postgresql[0].id : null
     )
   )

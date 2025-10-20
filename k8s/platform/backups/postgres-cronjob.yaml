@@ -1,0 +1,192 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+  namespace: platform-prod
+  labels:
+    app: postgres-backup
+    component: backup
+spec:
+  # Run daily at 2 AM
+  schedule: "0 2 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        metadata:
+          labels:
+            app: postgres-backup
+            component: backup
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: backup-operator
+          containers:
+          - name: postgres-backup
+            image: postgres:15-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              #!/bin/sh
+              set -euo pipefail
+              
+              log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"; }
+              error() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] ERROR: $1" >&2; }
+              
+              # Configuration
+              BACKUP_DATE=$(date '+%Y%m%d_%H%M%S')
+              BACKUP_DIR="/tmp/postgres-backup"
+              BACKUP_FILE="postgres_backup_${BACKUP_DATE}.sql"
+              COMPRESSED_FILE="${BACKUP_FILE}.gz"
+              
+              # MinIO configuration
+              MC_ALIAS="backup-minio"
+              BUCKET_NAME="backups"
+              BACKUP_PREFIX="postgres"
+              
+              log "Starting PostgreSQL backup process..."
+              
+              # Create backup directory
+              mkdir -p "$BACKUP_DIR"
+              cd "$BACKUP_DIR"
+              
+              # Install MinIO client
+              apk add --no-cache curl
+              curl -o /usr/local/bin/mc https://dl.min.io/client/mc/release/linux-amd64/mc
+              chmod +x /usr/local/bin/mc
+              
+              # Configure MinIO client
+              log "Configuring MinIO client..."
+              mc alias set "$MC_ALIAS" "http://${MINIO_ENDPOINT}" "$MINIO_ACCESS_KEY" "$MINIO_SECRET_KEY"
+              
+              # Test MinIO connectivity
+              if ! mc ls "$MC_ALIAS" > /dev/null 2>&1; then
+                  error "Failed to connect to MinIO"
+                  exit 1
+              fi
+              
+              log "Connected to MinIO successfully"
+              
+              # Create backup
+              log "Creating PostgreSQL backup..."
+              if pg_dumpall -h "$PGHOST" -p "$PGPORT" -U "$PGUSER" > "$BACKUP_FILE"; then
+                  log "Database dump completed successfully"
+              else
+                  error "Database dump failed"
+                  exit 1
+              fi
+              
+              # Compress backup
+              log "Compressing backup file..."
+              if gzip "$BACKUP_FILE"; then
+                  log "Backup compressed successfully"
+              else
+                  error "Failed to compress backup"
+                  exit 1
+              fi
+              
+              # Upload to MinIO
+              log "Uploading backup to MinIO..."
+              if mc cp "$COMPRESSED_FILE" "$MC_ALIAS/$BUCKET_NAME/$BACKUP_PREFIX/"; then
+                  log "Backup uploaded successfully to MinIO"
+              else
+                  error "Failed to upload backup to MinIO"
+                  exit 1
+              fi
+              
+              # Verify upload
+              REMOTE_SIZE=$(mc stat "$MC_ALIAS/$BUCKET_NAME/$BACKUP_PREFIX/$COMPRESSED_FILE" | grep Size | awk '{print $2}')
+              LOCAL_SIZE=$(stat -c%s "$COMPRESSED_FILE")
+              
+              if [ "$REMOTE_SIZE" = "$LOCAL_SIZE" ]; then
+                  log "Backup verification successful (Size: $LOCAL_SIZE bytes)"
+              else
+                  error "Backup verification failed (Local: $LOCAL_SIZE, Remote: $REMOTE_SIZE)"
+                  exit 1
+              fi
+              
+              # Clean up old backups
+              log "Cleaning up old backups (retention: ${BACKUP_RETENTION_DAYS:-30} days)..."
+              CUTOFF_DATE=$(date -d "${BACKUP_RETENTION_DAYS:-30} days ago" +%Y%m%d || date -v -${BACKUP_RETENTION_DAYS:-30}d +%Y%m%d)
+              
+              # List and remove old backups
+              mc ls "$MC_ALIAS/$BUCKET_NAME/$BACKUP_PREFIX/" | while read -r line; do
+                  FILENAME=$(echo "$line" | awk '{print $NF}')
+                  
+                  if [[ "$FILENAME" =~ postgres_backup_([0-9]{8})_ ]]; then
+                      FILE_DATE="${BASH_REMATCH[1]}"
+                      
+                      if [ "$FILE_DATE" -lt "$CUTOFF_DATE" ]; then
+                          log "Removing old backup: $FILENAME"
+                          mc rm "$MC_ALIAS/$BUCKET_NAME/$BACKUP_PREFIX/$FILENAME" || error "Failed to remove $FILENAME"
+                      fi
+                  fi
+              done
+              
+              # Clean up local files
+              rm -f "$COMPRESSED_FILE"
+              
+              log "PostgreSQL backup process completed successfully"
+            
+            env:
+            - name: PGHOST
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-config
+                  key: postgres_host
+                  optional: true
+            - name: PGPORT
+              value: "5432"
+            - name: PGUSER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: username
+                  optional: true
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: password
+                  optional: true
+            - name: MINIO_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: platform-config
+                  key: minio_endpoint
+                  optional: true
+            - name: MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: access_key
+                  optional: true
+            - name: MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minio-credentials
+                  key: secret_key
+                  optional: true
+            - name: BACKUP_RETENTION_DAYS
+              value: "30"
+            
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            
+            volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          
+          volumes:
+          - name: tmp
+            emptyDir: {}
+

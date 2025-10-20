@@ -70,7 +70,7 @@ resource "helm_release" "minio" {
       monitoring = {
         enabled = false
       }
-      
+
       # Resources
       resources = {
         requests = {

@@ -239,15 +239,22 @@ test_platform_deployment_simulation() {
             test_results=1
         fi
         
-        # Check for resource conflicts
-        local duplicate_names
-        duplicate_names=$(grep "^  name:" "$platform_manifests" | sort | uniq -d)
-        if [[ -z "$duplicate_names" ]]; then
-            success "No duplicate resource names found"
+        # Check for resource conflicts (same name + same kind = conflict)
+        # Extract kind and name pairs, then check for duplicates
+        local temp_file="/tmp/kind-name-pairs-$$"
+        awk '/^kind:/ { kind=$2 } /^  name:/ { if (kind != "") print kind":"$2; kind="" }' "$platform_manifests" > "$temp_file"
+        
+        local duplicate_resources
+        duplicate_resources=$(sort "$temp_file" | uniq -d)
+        
+        if [[ -z "$duplicate_resources" ]]; then
+            success "No duplicate resources found (same kind+name)"
         else
-            error "Duplicate resource names found: $duplicate_names"
+            error "Duplicate resources found (same kind+name): $duplicate_resources"
             test_results=1
         fi
+        
+        rm -f "$temp_file"
         
         rm -f "$platform_manifests"
     else
@@ -271,10 +278,15 @@ test_resource_requirements() {
     local total_services=0
     
     while IFS= read -r -d '' manifest_file; do
+        # Skip kustomization files
+        if [[ "$(basename "$manifest_file")" == "kustomization.yaml" ]]; then
+            continue
+        fi
+        
         if grep -q "kind: Deployment\|kind: StatefulSet\|kind: DaemonSet" "$manifest_file"; then
             total_services=$((total_services + 1))
             
-            if grep -A 20 "containers:" "$manifest_file" | grep -q "resources:"; then
+            if grep -A 50 "containers:" "$manifest_file" | grep -q "resources:"; then
                 services_with_resources=$((services_with_resources + 1))
             fi
         fi
@@ -305,10 +317,15 @@ test_health_checks() {
     local total_deployments=0
     
     while IFS= read -r -d '' manifest_file; do
+        # Skip kustomization files
+        if [[ "$(basename "$manifest_file")" == "kustomization.yaml" ]]; then
+            continue
+        fi
+        
         if grep -q "kind: Deployment" "$manifest_file"; then
             total_deployments=$((total_deployments + 1))
             
-            if grep -A 30 "containers:" "$manifest_file" | grep -q "livenessProbe\|readinessProbe"; then
+            if grep -A 50 "containers:" "$manifest_file" | grep -q "livenessProbe\|readinessProbe"; then
                 deployments_with_probes=$((deployments_with_probes + 1))
             fi
         fi

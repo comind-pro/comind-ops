@@ -27,7 +27,7 @@ resource "null_resource" "k3d_cluster" {
 
 # Set kubeconfig context for local k3d cluster
 resource "null_resource" "kubeconfig_local" {
-  count = var.cluster_type == "local" ? 1 : 0
+  count      = var.cluster_type == "local" ? 1 : 0
   depends_on = [null_resource.k3d_cluster]
 
   provisioner "local-exec" {

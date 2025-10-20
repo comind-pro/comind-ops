@@ -215,6 +215,13 @@ test_helm_chart_deployment() {
         done < <(find k8s/apps -name chart -type d -print0 2>/dev/null)
     fi
     
+    # Check if there are any charts to test
+    if [[ ${#charts_to_test[@]} -eq 0 ]]; then
+        log "No application charts found - skipping Helm deployment tests"
+        kubectl delete namespace "$test_namespace" --ignore-not-found=true > /dev/null 2>&1
+        return 0
+    fi
+    
     for app_name in "${charts_to_test[@]}"; do
         local chart_dir="k8s/apps/$app_name/chart"
         local values_file="k8s/apps/$app_name/chart/values.yaml"

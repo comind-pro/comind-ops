@@ -19,7 +19,7 @@ resource "null_resource" "install_metallb" {
 
 # Configure MetalLB
 resource "null_resource" "metallb_config" {
-  count = var.cluster_type == "local" ? 1 : 0
+  count      = var.cluster_type == "local" ? 1 : 0
   depends_on = [null_resource.install_metallb]
 
   provisioner "local-exec" {
@@ -56,7 +56,7 @@ resource "null_resource" "install_argocd" {
 
 # Wait for ArgoCD
 resource "null_resource" "wait_for_argocd" {
-  count = var.cluster_type == "local" ? 1 : 0
+  count      = var.cluster_type == "local" ? 1 : 0
   depends_on = [null_resource.install_argocd]
 
   provisioner "local-exec" {

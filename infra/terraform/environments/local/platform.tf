@@ -4,7 +4,8 @@
 
 locals {
   # Parse environments from comma-separated string or list
-  environments_list = can(tolist(var.environments)) ? tolist(var.environments) : split(",", tostring(var.environments))
+  # Trim whitespace from each environment name
+  environments_list = can(tolist(var.environments)) ? tolist(var.environments) : [for env in split(",", tostring(var.environments)) : trimspace(env)]
 }
 
 # ====================================================

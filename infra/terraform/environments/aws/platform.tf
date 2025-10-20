@@ -7,12 +7,12 @@ resource "kubernetes_namespace" "platform_dev" {
   metadata {
     name = "platform-dev"
     labels = {
-      "app.kubernetes.io/name" = "platform"
-      "app.kubernetes.io/instance" = "dev"
+      "app.kubernetes.io/name"       = "platform"
+      "app.kubernetes.io/instance"   = "dev"
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
-  
+
   depends_on = [module.eks]
 }
 
@@ -20,12 +20,12 @@ resource "kubernetes_namespace" "platform_stage" {
   metadata {
     name = "platform-stage"
     labels = {
-      "app.kubernetes.io/name" = "platform"
-      "app.kubernetes.io/instance" = "stage"
+      "app.kubernetes.io/name"       = "platform"
+      "app.kubernetes.io/instance"   = "stage"
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
-  
+
   depends_on = [module.eks]
 }
 
@@ -33,12 +33,12 @@ resource "kubernetes_namespace" "platform_prod" {
   metadata {
     name = "platform-prod"
     labels = {
-      "app.kubernetes.io/name" = "platform"
-      "app.kubernetes.io/instance" = "prod"
+      "app.kubernetes.io/name"       = "platform"
+      "app.kubernetes.io/instance"   = "prod"
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
-  
+
   depends_on = [module.eks]
 }
 
@@ -46,11 +46,11 @@ resource "kubernetes_namespace" "argocd" {
   metadata {
     name = "argocd"
     labels = {
-      "app.kubernetes.io/name" = "argocd"
+      "app.kubernetes.io/name"       = "argocd"
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
-  
+
   depends_on = [module.eks]
 }
 
@@ -58,11 +58,11 @@ resource "kubernetes_namespace" "sealed_secrets" {
   metadata {
     name = "sealed-secrets"
     labels = {
-      "app.kubernetes.io/name" = "sealed-secrets"
+      "app.kubernetes.io/name"       = "sealed-secrets"
       "app.kubernetes.io/managed-by" = "terraform"
     }
   }
-  
+
   depends_on = [module.eks]
 }
 
@@ -77,7 +77,7 @@ resource "helm_release" "argocd" {
   chart      = "argo-cd"
   version    = "5.49.0"
   namespace  = kubernetes_namespace.argocd.metadata[0].name
-  
+
   values = [
     templatefile("${path.module}/../../templates/argocd-values.yaml", {
       environment = var.environment
@@ -88,21 +88,21 @@ resource "helm_release" "argocd" {
         {
           name = "ssh-keys"
           secret = {
-            secretName = "argocd-repo-server-ssh-keys"
+            secretName  = "argocd-repo-server-ssh-keys"
             defaultMode = 0600
           }
         }
       ]) : "[]"
       repo_server_volume_mounts = var.repo_type == "private" ? jsonencode([
         {
-          name = "ssh-keys"
+          name      = "ssh-keys"
           mountPath = "/app/config/ssh"
-          readOnly = true
+          readOnly  = true
         }
       ]) : "[]"
     })
   ]
-  
+
   depends_on = [kubernetes_namespace.argocd]
 }
 
@@ -113,21 +113,21 @@ resource "kubernetes_secret" "argocd_repo_credentials" {
     name      = "argocd-repo-credentials"
     namespace = kubernetes_namespace.argocd.metadata[0].name
     labels = {
-      "app.kubernetes.io/name" = "argocd"
+      "app.kubernetes.io/name"      = "argocd"
       "app.kubernetes.io/component" = "repository"
-      "app.kubernetes.io/part-of" = "comind-ops-platform"
+      "app.kubernetes.io/part-of"   = "comind-ops-platform"
     }
   }
-  
+
   type = "Opaque"
-  
+
   data = {
     type     = base64encode("git")
     url      = base64encode(var.repo_url)
     username = base64encode(var.github_username)
     password = base64encode(var.github_token)
   }
-  
+
   depends_on = [kubernetes_namespace.argocd]
 }
 
@@ -138,14 +138,14 @@ resource "kubernetes_secret" "argocd_repo_server_ssh_keys" {
     name      = "argocd-repo-server-ssh-keys"
     namespace = kubernetes_namespace.argocd.metadata[0].name
     labels = {
-      "app.kubernetes.io/name" = "argocd"
+      "app.kubernetes.io/name"      = "argocd"
       "app.kubernetes.io/component" = "repository-server"
-      "app.kubernetes.io/part-of" = "comind-ops-platform"
+      "app.kubernetes.io/part-of"   = "comind-ops-platform"
     }
   }
-  
+
   type = "Opaque"
-  
+
   data = {
     ssh_known_hosts = base64encode(<<-EOT
       github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
@@ -154,7 +154,7 @@ resource "kubernetes_secret" "argocd_repo_server_ssh_keys" {
     )
     id_ed25519 = base64encode(var.github_ssh_private_key)
   }
-  
+
   depends_on = [kubernetes_namespace.argocd]
 }
 
@@ -167,9 +167,9 @@ resource "kubernetes_manifest" "argocd_project" {
       name      = "comind-ops-platform"
       namespace = kubernetes_namespace.argocd.metadata[0].name
       labels = {
-        "app.kubernetes.io/name" = "argocd"
+        "app.kubernetes.io/name"      = "argocd"
         "app.kubernetes.io/component" = "project"
-        "app.kubernetes.io/part-of" = "comind-ops-platform"
+        "app.kubernetes.io/part-of"   = "comind-ops-platform"
       }
     }
     spec = {
@@ -278,7 +278,7 @@ resource "kubernetes_manifest" "argocd_project" {
       ]
     }
   }
-  
+
   depends_on = [kubernetes_namespace.argocd]
 }
 
@@ -293,13 +293,13 @@ resource "helm_release" "sealed_secrets" {
   chart      = "sealed-secrets"
   version    = "2.13.2"
   namespace  = kubernetes_namespace.sealed_secrets.metadata[0].name
-  
+
   values = [
     yamlencode({
-      commandArgs = ["--update-status"]
+      commandArgs      = ["--update-status"]
       fullnameOverride = "sealed-secrets-controller"
     })
   ]
-  
+
   depends_on = [kubernetes_namespace.sealed_secrets]
 }
