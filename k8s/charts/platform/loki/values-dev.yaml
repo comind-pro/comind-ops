@@ -1,0 +1,21 @@
+# Development environment overrides
+loki:
+  loki:
+    limits_config:
+      retention_period: 168h  # 7 days for dev
+      ingestion_rate_mb: 5
+      ingestion_burst_size_mb: 10
+  
+  singleBinary:
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    
+    persistence:
+      size: 10Gi
+
+

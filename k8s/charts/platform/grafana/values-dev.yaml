@@ -1,0 +1,22 @@
+# Development environment overrides
+grafana:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 250m
+      memory: 256Mi
+  
+  persistence:
+    size: 5Gi
+  
+  ingress:
+    hosts:
+      - grafana.dev.127.0.0.1.nip.io
+  
+  grafana.ini:
+    server:
+      domain: grafana.dev.127.0.0.1.nip.io
+
+

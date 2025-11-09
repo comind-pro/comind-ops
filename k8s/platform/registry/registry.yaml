@@ -43,9 +43,6 @@ data:
         X-Content-Type-Options: [nosniff]
         X-Frame-Options: [deny]
         X-XSS-Protection: ["1; mode=block"]
-      tls:
-        certificate: /etc/certs/tls.crt
-        key: /etc/certs/tls.key
     auth:
       htpasswd:
         realm: basic-realm
@@ -125,17 +122,13 @@ spec:
             - name: tmp
               mountPath: /tmp
           livenessProbe:
-            httpGet:
-              path: /v2/
+            tcpSocket:
               port: 5000
-              scheme: HTTP
             initialDelaySeconds: 30
             periodSeconds: 10
           readinessProbe:
-            httpGet:
-              path: /v2/
+            tcpSocket:
               port: 5000
-              scheme: HTTP
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:

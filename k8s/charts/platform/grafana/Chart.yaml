@@ -1,0 +1,13 @@
+apiVersion: v2
+name: grafana
+description: Grafana visualization platform for Comind-Ops Platform
+type: application
+version: 1.0.0
+appVersion: "10.2.3"
+
+dependencies:
+  - name: grafana
+    version: "7.0.17"
+    repository: https://grafana.github.io/helm-charts
+
+

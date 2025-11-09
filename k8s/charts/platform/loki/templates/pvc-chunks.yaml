@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: loki-chunks
+  labels:
+    app: loki
+    component: chunks-storage
+    {{- include "loki.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.loki.singleBinary.persistence.size | default "50Gi" }}
+  {{- if .Values.loki.singleBinary.persistence.storageClassName }}
+  storageClassName: {{ .Values.loki.singleBinary.persistence.storageClassName }}
+  {{- end }}
+
+

@@ -1,0 +1,233 @@
+grafana:
+  # Replicas
+  replicas: 1
+  
+  # Admin credentials
+  adminUser: admin
+  adminPassword: "changeme123"  # CHANGE IN PRODUCTION - use sealed secrets
+  
+  # Resources
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  
+  # Persistence for dashboards and plugins
+  persistence:
+    enabled: true
+    type: pvc
+    accessModes:
+      - ReadWriteOnce
+    size: 10Gi
+    # storageClassName: standard
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 472
+    fsGroup: 472
+    seccompProfile:
+      type: RuntimeDefault
+  
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 3000
+  
+  # Ingress
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"
+      nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    hosts:
+      - grafana.dev.127.0.0.1.nip.io
+    path: /
+    pathType: Prefix
+  
+  # Datasources - Prometheus and Loki
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        # Prometheus datasource
+        - name: Prometheus
+          type: prometheus
+          access: proxy
+          url: http://prometheus-kube-prometheus-prometheus.monitoring:9090
+          isDefault: true
+          jsonData:
+            timeInterval: 30s
+            queryTimeout: 60s
+            httpMethod: POST
+          editable: false
+        
+        # Loki datasource
+        - name: Loki
+          type: loki
+          access: proxy
+          url: http://loki-gateway.monitoring:80
+          jsonData:
+            maxLines: 1000
+            derivedFields:
+              - datasourceUid: Prometheus
+                matcherRegex: "traceID=(\\w+)"
+                name: TraceID
+                url: "$${__value.raw}"
+          editable: false
+  
+  # Dashboard providers
+  dashboardProviders:
+    dashboardproviders.yaml:
+      apiVersion: 1
+      providers:
+        - name: 'default'
+          orgId: 1
+          folder: ''
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/default
+        
+        - name: 'kubernetes'
+          orgId: 1
+          folder: 'Kubernetes'
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/kubernetes
+        
+        - name: 'platform'
+          orgId: 1
+          folder: 'Platform'
+          type: file
+          disableDeletion: false
+          editable: true
+          options:
+            path: /var/lib/grafana/dashboards/platform
+  
+  # Pre-installed dashboards
+  dashboards:
+    default:
+      # Kubernetes cluster monitoring
+      kubernetes-cluster:
+        gnetId: 7249
+        revision: 1
+        datasource: Prometheus
+      
+      # Node exporter
+      node-exporter:
+        gnetId: 1860
+        revision: 31
+        datasource: Prometheus
+    
+    kubernetes:
+      # Kubernetes pods
+      kubernetes-pods:
+        gnetId: 6417
+        revision: 1
+        datasource: Prometheus
+      
+      # Kubernetes deployments
+      kubernetes-deployments:
+        gnetId: 8588
+        revision: 1
+        datasource: Prometheus
+    
+    platform:
+      # Loki logs
+      loki-logs:
+        gnetId: 13639
+        revision: 2
+        datasource: Loki
+  
+  # Grafana configuration
+  grafana.ini:
+    server:
+      domain: grafana.dev.127.0.0.1.nip.io
+      root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+      serve_from_sub_path: false
+    
+    analytics:
+      check_for_updates: true
+      reporting_enabled: false
+    
+    log:
+      mode: console
+      level: info
+    
+    auth:
+      disable_login_form: false
+      disable_signout_menu: false
+    
+    auth.anonymous:
+      enabled: false
+    
+    users:
+      allow_sign_up: false
+      auto_assign_org: true
+      auto_assign_org_role: Viewer
+    
+    security:
+      admin_user: admin
+      admin_password: changeme123
+      secret_key: SW2YcwTIb9zpOOhoPsMm
+      disable_gravatar: false
+    
+    snapshots:
+      external_enabled: false
+  
+  # Plugins to install
+  plugins:
+    - grafana-piechart-panel
+    - grafana-clock-panel
+    - grafana-simple-json-datasource
+  
+  # Service Monitor for Prometheus
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus
+    interval: 30s
+    scrapeTimeout: 10s
+  
+  # SMTP configuration (optional - for alerts)
+  smtp:
+    enabled: false
+    # host: smtp.gmail.com:587
+    # user: your-email@gmail.com
+    # password: your-app-password
+    # fromAddress: grafana@yourdomain.com
+    # fromName: Grafana
+  
+  # Environment variables
+  env:
+    GF_EXPLORE_ENABLED: "true"
+    GF_ALERTING_ENABLED: "true"
+    GF_UNIFIED_ALERTING_ENABLED: "true"
+    GF_FEATURE_TOGGLES_ENABLE: "tempoSearch tempoBackendSearch"
+  
+  # Sidecar for automated dashboard discovery
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      folder: /var/lib/grafana/dashboards
+      defaultFolderName: General
+      searchNamespace: ALL
+    
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+      searchNamespace: ALL
+
+

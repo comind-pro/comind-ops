@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: argocd
+
+resources:
+  - ../prometheus-app.yaml
+  - ../loki-app.yaml
+  - ../promtail-app.yaml
+  - ../grafana-app.yaml
+
+commonLabels:
+  environment: stage
+  managed-by: argocd
+
+# Patches for staging environment
+patches:
+  # Prometheus - use prod values for staging
+  - target:
+      kind: Application
+      name: prometheus
+    patch: |-
+      - op: replace
+        path: /spec/source/helm/valueFiles
+        value:
+          - values.yaml
+  
+  # Loki - use prod values for staging
+  - target:
+      kind: Application
+      name: loki
+    patch: |-
+      - op: replace
+        path: /spec/source/helm/valueFiles
+        value:
+          - values.yaml
+  
+  # Grafana - use prod values for staging
+  - target:
+      kind: Application
+      name: grafana
+    patch: |-
+      - op: replace
+        path: /spec/source/helm/valueFiles
+        value:
+          - values.yaml
+

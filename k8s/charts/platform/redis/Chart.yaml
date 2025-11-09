@@ -16,6 +16,6 @@ maintainers:
     email: team@comind.pro
 dependencies:
   - name: redis
-    version: "18.1.5"
+    version: "20.5.2"
     repository: "https://charts.bitnami.com/bitnami"
     condition: redis.enabled

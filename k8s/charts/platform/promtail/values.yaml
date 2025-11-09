@@ -1,0 +1,118 @@
+promtail:
+  # DaemonSet configuration
+  daemonset:
+    enabled: true
+  
+  # Resources
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+  
+  # Loki client configuration
+  config:
+    clients:
+      - url: http://loki-gateway.monitoring/loki/api/v1/push
+        tenant_id: 1
+    
+    # Positions file
+    positions:
+      filename: /run/promtail/positions.yaml
+    
+    # Scrape configs
+    scrape_configs:
+      # Kubernetes pods
+      - job_name: kubernetes-pods
+        pipeline_stages:
+          - cri: {}
+          - regex:
+              expression: '^(?P<time>\S+) (?P<stream>stdout|stderr) (?P<flags>\S+) (?P<content>.*)$'
+          - labels:
+              stream:
+          - timestamp:
+              source: time
+              format: RFC3339Nano
+          - output:
+              source: content
+        
+        kubernetes_sd_configs:
+          - role: pod
+        
+        relabel_configs:
+          # Only keep running pods
+          - source_labels: [__meta_kubernetes_pod_phase]
+            action: keep
+            regex: Running
+          
+          # Add namespace label
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: namespace
+          
+          # Add pod name label
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+          
+          # Add container name label
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            action: replace
+            target_label: container
+          
+          # Add app label
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: replace
+            target_label: app
+          
+          # Add job label (deployment/statefulset name)
+          - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+            action: replace
+            target_label: job
+          
+          # Set path to container logs
+          - source_labels: [__meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            target_label: __path__
+            separator: /
+            replacement: /var/log/pods/*$1/*.log
+  
+  # ServiceMonitor for Prometheus
+  serviceMonitor:
+    enabled: true
+    labels:
+      release: prometheus
+    interval: 30s
+  
+  # Security context
+  securityContext:
+    runAsNonRoot: false  # Needs root to read container logs
+    runAsUser: 0
+    fsGroup: 0
+    seccompProfile:
+      type: RuntimeDefault
+  
+  # Tolerations to run on all nodes
+  tolerations:
+    - effect: NoSchedule
+      operator: Exists
+  
+  # Extra volumes
+  extraVolumes:
+    - name: containers
+      hostPath:
+        path: /var/lib/docker/containers
+    - name: pods
+      hostPath:
+        path: /var/log/pods
+  
+  extraVolumeMounts:
+    - name: containers
+      mountPath: /var/lib/docker/containers
+      readOnly: true
+    - name: pods
+      mountPath: /var/log/pods
+      readOnly: true
+
+
